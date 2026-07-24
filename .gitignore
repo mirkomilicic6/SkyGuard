@@ -20,3 +20,5 @@ yarn-error.log
 
 # Local Claude Code settings (personal machine paths, not project config)
 /.claude
+__pycache__/
+*.pyc
