@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="DroneMGR Sample"
+     xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Long Corridor Flight</name>
+    <trkseg>
+      <!-- Takeoff and climb -->
+      <trkpt lat="45.7840" lon="15.8900"><ele>0</ele><time>2026-04-22T14:00:00Z</time></trkpt>
+      <trkpt lat="45.7843" lon="15.8905"><ele>22</ele><time>2026-04-22T14:00:10Z</time></trkpt>
+      <trkpt lat="45.7847" lon="15.8910"><ele>48</ele><time>2026-04-22T14:00:20Z</time></trkpt>
+      <trkpt lat="45.7851" lon="15.8915"><ele>75</ele><time>2026-04-22T14:00:30Z</time></trkpt>
+      <trkpt lat="45.7855" lon="15.8920"><ele>100</ele><time>2026-04-22T14:00:40Z</time></trkpt>
+      <!-- Outbound leg NE -->
+      <trkpt lat="45.7865" lon="15.8934"><ele>108</ele><time>2026-04-22T14:00:50Z</time></trkpt>
+      <trkpt lat="45.7876" lon="15.8948"><ele>112</ele><time>2026-04-22T14:01:00Z</time></trkpt>
+      <trkpt lat="45.7887" lon="15.8962"><ele>110</ele><time>2026-04-22T14:01:10Z</time></trkpt>
+      <trkpt lat="45.7898" lon="15.8976"><ele>115</ele><time>2026-04-22T14:01:20Z</time></trkpt>
+      <trkpt lat="45.7909" lon="15.8990"><ele>113</ele><time>2026-04-22T14:01:30Z</time></trkpt>
+      <trkpt lat="45.7920" lon="15.9004"><ele>117</ele><time>2026-04-22T14:01:40Z</time></trkpt>
+      <trkpt lat="45.7931" lon="15.9018"><ele>114</ele><time>2026-04-22T14:01:50Z</time></trkpt>
+      <trkpt lat="45.7942" lon="15.9032"><ele>118</ele><time>2026-04-22T14:02:00Z</time></trkpt>
+      <trkpt lat="45.7953" lon="15.9046"><ele>116</ele><time>2026-04-22T14:02:10Z</time></trkpt>
+      <trkpt lat="45.7964" lon="15.9060"><ele>119</ele><time>2026-04-22T14:02:20Z</time></trkpt>
+      <trkpt lat="45.7975" lon="15.9074"><ele>117</ele><time>2026-04-22T14:02:30Z</time></trkpt>
+      <trkpt lat="45.7986" lon="15.9088"><ele>120</ele><time>2026-04-22T14:02:40Z</time></trkpt>
+      <trkpt lat="45.7997" lon="15.9102"><ele>118</ele><time>2026-04-22T14:02:50Z</time></trkpt>
+      <trkpt lat="45.8008" lon="15.9116"><ele>121</ele><time>2026-04-22T14:03:00Z</time></trkpt>
+      <trkpt lat="45.8019" lon="15.9130"><ele>119</ele><time>2026-04-22T14:03:10Z</time></trkpt>
+      <trkpt lat="45.8030" lon="15.9144"><ele>122</ele><time>2026-04-22T14:03:20Z</time></trkpt>
+      <trkpt lat="45.8041" lon="15.9158"><ele>120</ele><time>2026-04-22T14:03:30Z</time></trkpt>
+      <trkpt lat="45.8052" lon="15.9172"><ele>118</ele><time>2026-04-22T14:03:40Z</time></trkpt>
+      <trkpt lat="45.8063" lon="15.9186"><ele>121</ele><time>2026-04-22T14:03:50Z</time></trkpt>
+      <trkpt lat="45.8074" lon="15.9200"><ele>119</ele><time>2026-04-22T14:04:00Z</time></trkpt>
+      <trkpt lat="45.8085" lon="15.9214"><ele>122</ele><time>2026-04-22T14:04:10Z</time></trkpt>
+      <trkpt lat="45.8096" lon="15.9228"><ele>120</ele><time>2026-04-22T14:04:20Z</time></trkpt>
+      <trkpt lat="45.8107" lon="15.9242"><ele>117</ele><time>2026-04-22T14:04:30Z</time></trkpt>
+      <trkpt lat="45.8118" lon="15.9256"><ele>115</ele><time>2026-04-22T14:04:40Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.9270"><ele>118</ele><time>2026-04-22T14:04:50Z</time></trkpt>
+      <!-- Turnaround -->
+      <trkpt lat="45.8138" lon="15.9278"><ele>116</ele><time>2026-04-22T14:05:00Z</time></trkpt>
+      <trkpt lat="45.8140" lon="15.9280"><ele>118</ele><time>2026-04-22T14:05:10Z</time></trkpt>
+      <!-- Return leg SW (offset slightly south) -->
+      <trkpt lat="45.8130" lon="15.9266"><ele>119</ele><time>2026-04-22T14:05:20Z</time></trkpt>
+      <trkpt lat="45.8119" lon="15.9252"><ele>121</ele><time>2026-04-22T14:05:30Z</time></trkpt>
+      <trkpt lat="45.8108" lon="15.9238"><ele>118</ele><time>2026-04-22T14:05:40Z</time></trkpt>
+      <trkpt lat="45.8097" lon="15.9224"><ele>120</ele><time>2026-04-22T14:05:50Z</time></trkpt>
+      <trkpt lat="45.8086" lon="15.9210"><ele>117</ele><time>2026-04-22T14:06:00Z</time></trkpt>
+      <trkpt lat="45.8075" lon="15.9196"><ele>119</ele><time>2026-04-22T14:06:10Z</time></trkpt>
+      <trkpt lat="45.8064" lon="15.9182"><ele>121</ele><time>2026-04-22T14:06:20Z</time></trkpt>
+      <trkpt lat="45.8053" lon="15.9168"><ele>118</ele><time>2026-04-22T14:06:30Z</time></trkpt>
+      <trkpt lat="45.8042" lon="15.9154"><ele>116</ele><time>2026-04-22T14:06:40Z</time></trkpt>
+      <trkpt lat="45.8031" lon="15.9140"><ele>119</ele><time>2026-04-22T14:06:50Z</time></trkpt>
+      <trkpt lat="45.8020" lon="15.9126"><ele>117</ele><time>2026-04-22T14:07:00Z</time></trkpt>
+      <trkpt lat="45.8009" lon="15.9112"><ele>120</ele><time>2026-04-22T14:07:10Z</time></trkpt>
+      <trkpt lat="45.7998" lon="15.9098"><ele>118</ele><time>2026-04-22T14:07:20Z</time></trkpt>
+      <trkpt lat="45.7987" lon="15.9084"><ele>115</ele><time>2026-04-22T14:07:30Z</time></trkpt>
+      <trkpt lat="45.7976" lon="15.9070"><ele>117</ele><time>2026-04-22T14:07:40Z</time></trkpt>
+      <trkpt lat="45.7965" lon="15.9056"><ele>114</ele><time>2026-04-22T14:07:50Z</time></trkpt>
+      <trkpt lat="45.7954" lon="15.9042"><ele>116</ele><time>2026-04-22T14:08:00Z</time></trkpt>
+      <trkpt lat="45.7943" lon="15.9028"><ele>113</ele><time>2026-04-22T14:08:10Z</time></trkpt>
+      <trkpt lat="45.7932" lon="15.9014"><ele>115</ele><time>2026-04-22T14:08:20Z</time></trkpt>
+      <trkpt lat="45.7921" lon="15.9000"><ele>112</ele><time>2026-04-22T14:08:30Z</time></trkpt>
+      <trkpt lat="45.7910" lon="15.8986"><ele>110</ele><time>2026-04-22T14:08:40Z</time></trkpt>
+      <trkpt lat="45.7899" lon="15.8972"><ele>113</ele><time>2026-04-22T14:08:50Z</time></trkpt>
+      <trkpt lat="45.7888" lon="15.8958"><ele>111</ele><time>2026-04-22T14:09:00Z</time></trkpt>
+      <trkpt lat="45.7877" lon="15.8944"><ele>108</ele><time>2026-04-22T14:09:10Z</time></trkpt>
+      <trkpt lat="45.7866" lon="15.8930"><ele>106</ele><time>2026-04-22T14:09:20Z</time></trkpt>
+      <!-- Approach and descend -->
+      <trkpt lat="45.7857" lon="15.8918"><ele>88</ele><time>2026-04-22T14:09:30Z</time></trkpt>
+      <trkpt lat="45.7851" lon="15.8910"><ele>65</ele><time>2026-04-22T14:09:40Z</time></trkpt>
+      <trkpt lat="45.7846" lon="15.8905"><ele>38</ele><time>2026-04-22T14:09:50Z</time></trkpt>
+      <trkpt lat="45.7842" lon="15.8901"><ele>15</ele><time>2026-04-22T14:10:00Z</time></trkpt>
+      <trkpt lat="45.7840" lon="15.8900"><ele>0</ele><time>2026-04-22T14:10:10Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

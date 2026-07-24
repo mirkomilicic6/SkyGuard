@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'full_name'                  => 'Ime i prezime',
+    'email'                      => 'E-mail adresa',
+    'password'                   => 'Lozinka',
+    'retype_password'            => 'Ponovi lozinku',
+    'remember_me'                => 'Zapamti me',
+    'register'                   => 'Registracija',
+    'register_a_new_membership'  => 'Registriraj novi račun',
+    'i_forgot_my_password'       => 'Zaboravili ste lozinku?',
+    'i_already_have_a_membership'=> 'Već imam račun',
+    'sign_in'                    => 'Prijava',
+    'log_out'                    => 'Odjava',
+    'toggle_navigation'          => 'Prikaži/sakrij navigaciju',
+    'login_message'              => 'Prijavite se za pristup sustavu',
+    'register_message'           => 'Registracija novog korisnika',
+    'password_reset_message'     => 'Resetiranje lozinke',
+    'reset_password'             => 'Resetiraj lozinku',
+    'send_password_reset_link'   => 'Pošalji link za reset lozinke',
+    'verify_message'             => 'Vaš račun treba verifikaciju',
+    'verify_email_sent'          => 'Novi verifikacijski link je poslan na vašu e-mail adresu.',
+    'verify_check_your_email'    => 'Prije nastavka, provjerite e-mail za verifikacijski link.',
+    'verify_if_not_recieved'     => 'Ako niste primili e-mail',
+    'verify_request_another'     => 'kliknite ovdje za ponovni zahtjev',
+    'confirm_password_message'   => 'Molimo potvrdite lozinku za nastavak.',
+    'remember_me_hint'           => 'Ostani prijavljen dok se ručno ne odjaviš',
+];

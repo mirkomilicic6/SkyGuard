@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="DroneMGR Sample"
+     xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Circular Patrol Flight</name>
+    <trkseg>
+      <!-- Takeoff and climb -->
+      <trkpt lat="45.8000" lon="15.9220"><ele>0</ele><time>2026-04-20T07:00:00Z</time></trkpt>
+      <trkpt lat="45.8002" lon="15.9221"><ele>18</ele><time>2026-04-20T07:00:10Z</time></trkpt>
+      <trkpt lat="45.8004" lon="15.9222"><ele>40</ele><time>2026-04-20T07:00:20Z</time></trkpt>
+      <trkpt lat="45.8006" lon="15.9222"><ele>62</ele><time>2026-04-20T07:00:30Z</time></trkpt>
+      <trkpt lat="45.8008" lon="15.9221"><ele>85</ele><time>2026-04-20T07:00:40Z</time></trkpt>
+      <!-- Circle loop 1: clockwise from north -->
+      <trkpt lat="45.8038" lon="15.9220"><ele>95</ele><time>2026-04-20T07:00:50Z</time></trkpt>
+      <trkpt lat="45.8027" lon="15.9255"><ele>98</ele><time>2026-04-20T07:01:00Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9268"><ele>100</ele><time>2026-04-20T07:01:10Z</time></trkpt>
+      <trkpt lat="45.7973" lon="15.9255"><ele>102</ele><time>2026-04-20T07:01:20Z</time></trkpt>
+      <trkpt lat="45.7962" lon="15.9220"><ele>99</ele><time>2026-04-20T07:01:30Z</time></trkpt>
+      <trkpt lat="45.7973" lon="15.9185"><ele>97</ele><time>2026-04-20T07:01:40Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9172"><ele>100</ele><time>2026-04-20T07:01:50Z</time></trkpt>
+      <trkpt lat="45.8027" lon="15.9185"><ele>103</ele><time>2026-04-20T07:02:00Z</time></trkpt>
+      <!-- Circle loop 2 -->
+      <trkpt lat="45.8038" lon="15.9220"><ele>101</ele><time>2026-04-20T07:02:10Z</time></trkpt>
+      <trkpt lat="45.8027" lon="15.9255"><ele>104</ele><time>2026-04-20T07:02:20Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9268"><ele>106</ele><time>2026-04-20T07:02:30Z</time></trkpt>
+      <trkpt lat="45.7973" lon="15.9255"><ele>103</ele><time>2026-04-20T07:02:40Z</time></trkpt>
+      <trkpt lat="45.7962" lon="15.9220"><ele>100</ele><time>2026-04-20T07:02:50Z</time></trkpt>
+      <trkpt lat="45.7973" lon="15.9185"><ele>98</ele><time>2026-04-20T07:03:00Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9172"><ele>101</ele><time>2026-04-20T07:03:10Z</time></trkpt>
+      <trkpt lat="45.8027" lon="15.9185"><ele>105</ele><time>2026-04-20T07:03:20Z</time></trkpt>
+      <!-- Circle loop 3 -->
+      <trkpt lat="45.8038" lon="15.9220"><ele>102</ele><time>2026-04-20T07:03:30Z</time></trkpt>
+      <trkpt lat="45.8027" lon="15.9255"><ele>99</ele><time>2026-04-20T07:03:40Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9268"><ele>97</ele><time>2026-04-20T07:03:50Z</time></trkpt>
+      <trkpt lat="45.7973" lon="15.9255"><ele>100</ele><time>2026-04-20T07:04:00Z</time></trkpt>
+      <trkpt lat="45.7962" lon="15.9220"><ele>103</ele><time>2026-04-20T07:04:10Z</time></trkpt>
+      <trkpt lat="45.7973" lon="15.9185"><ele>101</ele><time>2026-04-20T07:04:20Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9172"><ele>99</ele><time>2026-04-20T07:04:30Z</time></trkpt>
+      <trkpt lat="45.8027" lon="15.9185"><ele>96</ele><time>2026-04-20T07:04:40Z</time></trkpt>
+      <trkpt lat="45.8038" lon="15.9220"><ele>94</ele><time>2026-04-20T07:04:50Z</time></trkpt>
+      <!-- Return to centre and descend -->
+      <trkpt lat="45.8020" lon="15.9220"><ele>88</ele><time>2026-04-20T07:05:00Z</time></trkpt>
+      <trkpt lat="45.8012" lon="15.9221"><ele>68</ele><time>2026-04-20T07:05:10Z</time></trkpt>
+      <trkpt lat="45.8006" lon="15.9221"><ele>45</ele><time>2026-04-20T07:05:20Z</time></trkpt>
+      <trkpt lat="45.8002" lon="15.9220"><ele>20</ele><time>2026-04-20T07:05:30Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9220"><ele>0</ele><time>2026-04-20T07:05:40Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

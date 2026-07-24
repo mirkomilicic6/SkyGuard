@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="DroneMGR Sample"
+     xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Grid Survey Flight</name>
+    <trkseg>
+      <!-- Takeoff and climb to survey altitude -->
+      <trkpt lat="45.8120" lon="15.8780"><ele>0</ele><time>2026-04-21T08:30:00Z</time></trkpt>
+      <trkpt lat="45.8121" lon="15.8780"><ele>15</ele><time>2026-04-21T08:30:10Z</time></trkpt>
+      <trkpt lat="45.8122" lon="15.8781"><ele>32</ele><time>2026-04-21T08:30:20Z</time></trkpt>
+      <trkpt lat="45.8123" lon="15.8781"><ele>50</ele><time>2026-04-21T08:30:30Z</time></trkpt>
+      <trkpt lat="45.8124" lon="15.8782"><ele>62</ele><time>2026-04-21T08:30:40Z</time></trkpt>
+      <!-- Row 1 eastbound at 45.8130 -->
+      <trkpt lat="45.8130" lon="15.8780"><ele>65</ele><time>2026-04-21T08:30:50Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8800"><ele>64</ele><time>2026-04-21T08:31:00Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8820"><ele>66</ele><time>2026-04-21T08:31:10Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8840"><ele>63</ele><time>2026-04-21T08:31:20Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8860"><ele>65</ele><time>2026-04-21T08:31:30Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8880"><ele>67</ele><time>2026-04-21T08:31:40Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8900"><ele>64</ele><time>2026-04-21T08:31:50Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8920"><ele>62</ele><time>2026-04-21T08:32:00Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8940"><ele>65</ele><time>2026-04-21T08:32:10Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8960"><ele>63</ele><time>2026-04-21T08:32:20Z</time></trkpt>
+      <trkpt lat="45.8130" lon="15.8980"><ele>66</ele><time>2026-04-21T08:32:30Z</time></trkpt>
+      <!-- Turn south -->
+      <trkpt lat="45.8120" lon="15.8980"><ele>65</ele><time>2026-04-21T08:32:40Z</time></trkpt>
+      <!-- Row 2 westbound at 45.8120 -->
+      <trkpt lat="45.8120" lon="15.8960"><ele>64</ele><time>2026-04-21T08:32:50Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8940"><ele>66</ele><time>2026-04-21T08:33:00Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8920"><ele>63</ele><time>2026-04-21T08:33:10Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8900"><ele>65</ele><time>2026-04-21T08:33:20Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8880"><ele>67</ele><time>2026-04-21T08:33:30Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8860"><ele>64</ele><time>2026-04-21T08:33:40Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8840"><ele>62</ele><time>2026-04-21T08:33:50Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8820"><ele>65</ele><time>2026-04-21T08:34:00Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8800"><ele>63</ele><time>2026-04-21T08:34:10Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8780"><ele>66</ele><time>2026-04-21T08:34:20Z</time></trkpt>
+      <!-- Turn south -->
+      <trkpt lat="45.8110" lon="15.8780"><ele>65</ele><time>2026-04-21T08:34:30Z</time></trkpt>
+      <!-- Row 3 eastbound at 45.8110 -->
+      <trkpt lat="45.8110" lon="15.8800"><ele>64</ele><time>2026-04-21T08:34:40Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8820"><ele>66</ele><time>2026-04-21T08:34:50Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8840"><ele>63</ele><time>2026-04-21T08:35:00Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8860"><ele>65</ele><time>2026-04-21T08:35:10Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8880"><ele>67</ele><time>2026-04-21T08:35:20Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8900"><ele>64</ele><time>2026-04-21T08:35:30Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8920"><ele>62</ele><time>2026-04-21T08:35:40Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8940"><ele>65</ele><time>2026-04-21T08:35:50Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8960"><ele>63</ele><time>2026-04-21T08:36:00Z</time></trkpt>
+      <trkpt lat="45.8110" lon="15.8980"><ele>66</ele><time>2026-04-21T08:36:10Z</time></trkpt>
+      <!-- Turn south -->
+      <trkpt lat="45.8100" lon="15.8980"><ele>65</ele><time>2026-04-21T08:36:20Z</time></trkpt>
+      <!-- Row 4 westbound at 45.8100 -->
+      <trkpt lat="45.8100" lon="15.8960"><ele>64</ele><time>2026-04-21T08:36:30Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8940"><ele>62</ele><time>2026-04-21T08:36:40Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8920"><ele>65</ele><time>2026-04-21T08:36:50Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8900"><ele>63</ele><time>2026-04-21T08:37:00Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8880"><ele>61</ele><time>2026-04-21T08:37:10Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8860"><ele>64</ele><time>2026-04-21T08:37:20Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8840"><ele>62</ele><time>2026-04-21T08:37:30Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8820"><ele>60</ele><time>2026-04-21T08:37:40Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8800"><ele>63</ele><time>2026-04-21T08:37:50Z</time></trkpt>
+      <trkpt lat="45.8100" lon="15.8780"><ele>61</ele><time>2026-04-21T08:38:00Z</time></trkpt>
+      <!-- Return to launch and descend -->
+      <trkpt lat="45.8115" lon="15.8780"><ele>55</ele><time>2026-04-21T08:38:10Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8780"><ele>40</ele><time>2026-04-21T08:38:20Z</time></trkpt>
+      <trkpt lat="45.8121" lon="15.8780"><ele>22</ele><time>2026-04-21T08:38:30Z</time></trkpt>
+      <trkpt lat="45.8120" lon="15.8780"><ele>0</ele><time>2026-04-21T08:38:40Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

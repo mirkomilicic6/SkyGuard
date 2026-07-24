@@ -1,0 +1,100 @@
+/* ── App-wide pagination — dark navy/gold theme ──────────────────────────── */
+
+.app-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Base link */
+.app-pagination .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px !important;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+/* Prev / Next arrow buttons — slightly wider */
+.app-pagination .page-link.page-arrow {
+    min-width: 38px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Hover state */
+.app-pagination .page-item:not(.disabled):not(.active) .page-link:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #fff;
+}
+
+.app-pagination .page-item:not(.disabled) .page-link.page-arrow:hover {
+    background: rgba(240, 192, 64, 0.1);
+    border-color: rgba(240, 192, 64, 0.35);
+    color: #f0c040;
+}
+
+/* Active page */
+.app-pagination .page-item.active .page-link {
+    background: var(--gold, #f0c040);
+    border-color: var(--gold, #f0c040);
+    color: #1a1a2e;
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(240, 192, 64, 0.3);
+}
+
+/* Disabled state */
+.app-pagination .page-item.disabled .page-link {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.18);
+    cursor: default;
+    pointer-events: none;
+}
+
+/* Ellipsis dots */
+.app-pagination .page-item.disabled .page-link:not(.page-arrow) {
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.25);
+    letter-spacing: 1px;
+}
+
+/* Remove Bootstrap's built-in first/last radius overrides */
+.app-pagination .page-item:first-child .page-link,
+.app-pagination .page-item:last-child  .page-link {
+    border-radius: 8px !important;
+}
+
+/* ── Wrapper used on dashboard ───────────────────────────────────────────── */
+.db-pagination {
+    padding: 0.9rem 1.4rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: center;
+}
+
+/* ── Card-footer pagination (users, detections, etc.) ────────────────────── */
+.card-footer .app-pagination {
+    justify-content: center;
+}
+
+/* Override Bootstrap 4 card-footer default white background on paginator */
+.card-footer nav {
+    display: flex;
+    justify-content: center;
+}

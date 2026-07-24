@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="DroneMGR Sample"
+     xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Sample Drone Flight</name>
+    <trkseg>
+      <trkpt lat="45.8000" lon="15.9000"><ele>0</ele><time>2026-04-26T09:00:00Z</time></trkpt>
+      <trkpt lat="45.8005" lon="15.9001"><ele>20</ele><time>2026-04-26T09:00:10Z</time></trkpt>
+      <trkpt lat="45.8010" lon="15.9002"><ele>45</ele><time>2026-04-26T09:00:20Z</time></trkpt>
+      <trkpt lat="45.8015" lon="15.9003"><ele>70</ele><time>2026-04-26T09:00:30Z</time></trkpt>
+      <trkpt lat="45.8020" lon="15.9004"><ele>95</ele><time>2026-04-26T09:00:40Z</time></trkpt>
+      <trkpt lat="45.8025" lon="15.9005"><ele>115</ele><time>2026-04-26T09:00:50Z</time></trkpt>
+      <trkpt lat="45.8030" lon="15.9006"><ele>120</ele><time>2026-04-26T09:01:00Z</time></trkpt>
+      <trkpt lat="45.8035" lon="15.9006"><ele>122</ele><time>2026-04-26T09:01:10Z</time></trkpt>
+      <trkpt lat="45.8040" lon="15.9007"><ele>118</ele><time>2026-04-26T09:01:20Z</time></trkpt>
+      <trkpt lat="45.8045" lon="15.9007"><ele>125</ele><time>2026-04-26T09:01:30Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9008"><ele>130</ele><time>2026-04-26T09:01:40Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9020"><ele>128</ele><time>2026-04-26T09:01:50Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9032"><ele>132</ele><time>2026-04-26T09:02:00Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9044"><ele>135</ele><time>2026-04-26T09:02:10Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9056"><ele>133</ele><time>2026-04-26T09:02:20Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9068"><ele>130</ele><time>2026-04-26T09:02:30Z</time></trkpt>
+      <trkpt lat="45.8050" lon="15.9080"><ele>128</ele><time>2026-04-26T09:02:40Z</time></trkpt>
+      <trkpt lat="45.8048" lon="15.9092"><ele>126</ele><time>2026-04-26T09:02:50Z</time></trkpt>
+      <trkpt lat="45.8046" lon="15.9100"><ele>124</ele><time>2026-04-26T09:03:00Z</time></trkpt>
+      <trkpt lat="45.8040" lon="15.9100"><ele>122</ele><time>2026-04-26T09:03:10Z</time></trkpt>
+      <trkpt lat="45.8030" lon="15.9100"><ele>125</ele><time>2026-04-26T09:03:20Z</time></trkpt>
+      <trkpt lat="45.8020" lon="15.9100"><ele>128</ele><time>2026-04-26T09:03:30Z</time></trkpt>
+      <trkpt lat="45.8010" lon="15.9100"><ele>130</ele><time>2026-04-26T09:03:40Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9100"><ele>127</ele><time>2026-04-26T09:03:50Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9100"><ele>125</ele><time>2026-04-26T09:04:00Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9090"><ele>122</ele><time>2026-04-26T09:04:10Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9080"><ele>118</ele><time>2026-04-26T09:04:20Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9070"><ele>120</ele><time>2026-04-26T09:04:30Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9060"><ele>123</ele><time>2026-04-26T09:04:40Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9050"><ele>125</ele><time>2026-04-26T09:04:50Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9040"><ele>122</ele><time>2026-04-26T09:05:00Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9030"><ele>118</ele><time>2026-04-26T09:05:10Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9020"><ele>115</ele><time>2026-04-26T09:05:20Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9010"><ele>110</ele><time>2026-04-26T09:05:30Z</time></trkpt>
+      <trkpt lat="45.7990" lon="15.9000"><ele>105</ele><time>2026-04-26T09:05:40Z</time></trkpt>
+      <trkpt lat="45.7993" lon="15.9000"><ele>90</ele><time>2026-04-26T09:05:50Z</time></trkpt>
+      <trkpt lat="45.7996" lon="15.9000"><ele>70</ele><time>2026-04-26T09:06:00Z</time></trkpt>
+      <trkpt lat="45.7998" lon="15.9000"><ele>45</ele><time>2026-04-26T09:06:10Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9000"><ele>10</ele><time>2026-04-26T09:06:20Z</time></trkpt>
+      <trkpt lat="45.8000" lon="15.9000"><ele>0</ele><time>2026-04-26T09:06:30Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
