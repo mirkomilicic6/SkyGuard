@@ -451,4 +451,56 @@ return [
         'need_three_points' => 'The boundary needs at least 3 points, or leave it empty to use the 10km circle.',
     ],
 
+    // --- Police stations ---
+    'police_stations' => [
+        'index_title'      => 'Police Stations',
+        'index_intro'      => 'Overview of all police stations by administration. Adding, editing and deleting stations is available to the super admin only.',
+        'add_station'      => 'Add Station',
+        'edit_station'     => 'Edit Station',
+        'name'             => 'Station Name',
+        'administration'   => 'Administration',
+        'users_count'      => 'Users',
+        'drones_count'     => 'Drones',
+        'boundary_status'  => 'Boundary',
+        'no_stations'      => 'No stations in this administration.',
+        'set_center_hint'  => 'Click the map to set the station\'s location (center).',
+        'draw_boundary_hint' => 'Optionally draw the station boundary right away (polygon tool, top right) — or do it later in "Station Boundaries".',
+        'center_required'  => 'Click the map first to set the station location.',
+        'created'          => 'Station \':name\' created.',
+        'updated'          => 'Station \':name\' updated.',
+        'deleted'          => 'Station \':name\' deleted.',
+        'delete_blocked'   => 'Station \':name\' cannot be deleted because it has assigned users or drones.',
+    ],
+
+    // --- Police administrations ---
+    'police_administrations' => [
+        'index_title'      => 'Police Administrations',
+        'index_intro'      => 'Overview of all police administrations and their stations on the map. Adding, editing and deleting administrations is available to the super admin only.',
+        'add_administration'  => 'Add Administration',
+        'edit_administration' => 'Edit Administration',
+        'name'             => 'Administration Name',
+        'stations_count'   => 'Stations',
+        'no_administrations' => 'No administrations defined.',
+        'created'          => 'Administration \':name\' created.',
+        'updated'          => 'Administration \':name\' updated.',
+        'deleted'          => 'Administration \':name\' deleted.',
+        'delete_blocked'   => 'Administration \':name\' cannot be deleted because it has assigned stations.',
+    ],
+
+    // --- Map layer filter (stations / administrations / both) ---
+    'map_filter' => [
+        'both'            => 'Both',
+        'stations'        => 'Stations',
+        'administrations' => 'Administrations',
+    ],
+
+    // --- Administration (uprava) boundaries ---
+    'admin_boundary' => [
+        'edit_title'          => 'Administration Boundary',
+        'legend'              => 'Legend',
+        'this_administration' => 'This administration\'s boundary',
+        'neighbor_legend'     => 'Neighbouring administration boundaries (reference only)',
+        'status_not_drawn'    => 'Not drawn',
+    ],
+
 ];

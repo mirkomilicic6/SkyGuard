@@ -11,6 +11,8 @@ return [
     'detections'        => 'Detekcije',
     'station_crew'      => 'Posada postaje',
     'station_boundary'  => 'Granice postaja',
+    'police_administrations' => 'Policijske uprave',
+    'police_stations'   => 'Policijske postaje',
     'structure_header'  => 'USTROJSTVO',
     'ai_header'         => 'AI ALATI',
     'analytics'         => 'Analitika',

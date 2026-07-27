@@ -11,6 +11,8 @@ return [
     'detections'        => 'Detections',
     'station_crew'      => 'Station Crew',
     'station_boundary'  => 'Station Boundaries',
+    'police_administrations' => 'Police Administrations',
+    'police_stations'   => 'Police Stations',
     'structure_header'  => 'STRUCTURE',
     'ai_header'         => 'AI TOOLS',
     'analytics'         => 'Analytics',

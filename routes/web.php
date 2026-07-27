@@ -15,6 +15,9 @@ use App\Http\Controllers\AiController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\StationBoundaryController;
+use App\Http\Controllers\PoliceStationController;
+use App\Http\Controllers\PoliceAdministrationController;
+use App\Http\Controllers\AdministrationBoundaryController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => redirect()->route('dashboard'));
@@ -116,11 +119,37 @@ Route::middleware(['auth'])->group(function () {
         Route::get('search', [SearchController::class, 'index'])->name('search.index');
     });
 
+    // ── Police administrations (list: admin + viewer; add/edit/delete: super admin only) ─
+    Route::middleware('can:manage station boundary')->group(function () {
+        Route::get('police-administrations', [PoliceAdministrationController::class, 'index'])->name('police-administrations.index');
+        Route::get('police-administrations/create', [PoliceAdministrationController::class, 'create'])->name('police-administrations.create');
+        Route::post('police-administrations', [PoliceAdministrationController::class, 'store'])->name('police-administrations.store');
+        Route::get('police-administrations/{administration}/edit', [PoliceAdministrationController::class, 'edit'])->name('police-administrations.edit');
+        Route::put('police-administrations/{administration}', [PoliceAdministrationController::class, 'update'])->name('police-administrations.update');
+        Route::delete('police-administrations/{administration}', [PoliceAdministrationController::class, 'destroy'])->name('police-administrations.destroy');
+    });
+
+    // ── Police stations (list: admin + viewer; add/edit/delete: super admin only) ─
+    Route::middleware('can:manage station boundary')->group(function () {
+        Route::get('police-stations', [PoliceStationController::class, 'index'])->name('police-stations.index');
+        Route::get('police-stations/create', [PoliceStationController::class, 'create'])->name('police-stations.create');
+        Route::post('police-stations', [PoliceStationController::class, 'store'])->name('police-stations.store');
+        Route::get('police-stations/{station}/edit', [PoliceStationController::class, 'edit'])->name('police-stations.edit');
+        Route::put('police-stations/{station}', [PoliceStationController::class, 'update'])->name('police-stations.update');
+        Route::delete('police-stations/{station}', [PoliceStationController::class, 'destroy'])->name('police-stations.destroy');
+    });
+
     // ── Station boundaries (admin + viewer draw/edit their own scope) ─────────
     Route::middleware('can:manage station boundary')->group(function () {
         Route::get('station-boundary', [StationBoundaryController::class, 'index'])->name('station-boundary.index');
         Route::get('station-boundary/{station}/edit', [StationBoundaryController::class, 'edit'])->name('station-boundary.edit');
         Route::put('station-boundary/{station}', [StationBoundaryController::class, 'update'])->name('station-boundary.update');
+    });
+
+    // ── Administration boundaries (admin + viewer draw/edit their own uprava) ──
+    Route::middleware('can:manage station boundary')->group(function () {
+        Route::get('administration-boundary/{administration}/edit', [AdministrationBoundaryController::class, 'edit'])->name('administration-boundary.edit');
+        Route::put('administration-boundary/{administration}', [AdministrationBoundaryController::class, 'update'])->name('administration-boundary.update');
     });
 
     // ── Notifications (admin + pilot) ────────────────────────────────────────

@@ -430,4 +430,56 @@ return [
         'need_three_points' => 'Granica mora imati najmanje 3 točke, ili je ostavite praznom da se koristi krug od 10 km.',
     ],
 
+    // --- Police stations ---
+    'police_stations' => [
+        'index_title'      => 'Policijske postaje',
+        'index_intro'      => 'Pregled svih policijskih postaja po upravama. Dodavanje, uređivanje i brisanje postaja dostupno je samo super adminu.',
+        'add_station'      => 'Dodaj postaju',
+        'edit_station'     => 'Uredi postaju',
+        'name'             => 'Naziv postaje',
+        'administration'   => 'Uprava',
+        'users_count'      => 'Korisnika',
+        'drones_count'     => 'Dronova',
+        'boundary_status'  => 'Granica',
+        'no_stations'      => 'Nema postaja u ovoj upravi.',
+        'set_center_hint'  => 'Kliknite na kartu da postavite lokaciju (centar) postaje.',
+        'draw_boundary_hint' => 'Po želji odmah nacrtajte i granicu postaje (alat za poligon gore desno) — ili to napravite kasnije u "Granice postaja".',
+        'center_required'  => 'Prvo kliknite na kartu da postavite lokaciju postaje.',
+        'created'          => 'Postaja \':name\' je kreirana.',
+        'updated'          => 'Postaja \':name\' je ažurirana.',
+        'deleted'          => 'Postaja \':name\' je obrisana.',
+        'delete_blocked'   => 'Postaja \':name\' se ne može obrisati jer ima dodijeljene korisnike ili dronove.',
+    ],
+
+    // --- Police administrations ---
+    'police_administrations' => [
+        'index_title'      => 'Policijske uprave',
+        'index_intro'      => 'Pregled svih policijskih uprava i njihovih postaja na karti. Dodavanje, uređivanje i brisanje uprava dostupno je samo super adminu.',
+        'add_administration'  => 'Dodaj upravu',
+        'edit_administration' => 'Uredi upravu',
+        'name'             => 'Naziv uprave',
+        'stations_count'   => 'Postaja',
+        'no_administrations' => 'Nema definiranih uprava.',
+        'created'          => 'Uprava \':name\' je kreirana.',
+        'updated'          => 'Uprava \':name\' je ažurirana.',
+        'deleted'          => 'Uprava \':name\' je obrisana.',
+        'delete_blocked'   => 'Uprava \':name\' se ne može obrisati jer ima dodijeljene postaje.',
+    ],
+
+    // --- Map layer filter (stations / administrations / both) ---
+    'map_filter' => [
+        'both'            => 'Oboje',
+        'stations'        => 'Postaje',
+        'administrations' => 'Uprave',
+    ],
+
+    // --- Administration (uprava) boundaries ---
+    'admin_boundary' => [
+        'edit_title'          => 'Granica uprave',
+        'legend'              => 'Legenda',
+        'this_administration' => 'Granica ove uprave',
+        'neighbor_legend'     => 'Granice susjednih uprava (za orijentaciju, samo za pregled)',
+        'status_not_drawn'    => 'Nije nacrtano',
+    ],
+
 ];

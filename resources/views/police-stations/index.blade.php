@@ -1,18 +1,27 @@
 @extends('adminlte::page')
 
-@section('title', __('ui.boundary.index_title'))
+@section('title', __('ui.police_stations.index_title'))
 
 @section('content_header')
-    <h1>{{ __('ui.boundary.index_title') }}</h1>
+    <h1>
+        {{ __('ui.police_stations.index_title') }}
+        @if(auth()->user()->station_id === null)
+        <a href="{{ route('police-stations.create') }}" class="btn btn-primary btn-sm float-right">
+            <i class="fas fa-plus"></i> {{ __('ui.police_stations.add_station') }}
+        </a>
+        @endif
+    </h1>
 @endsection
 
 @section('content')
-
 @if(session('success'))
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
+@if(session('error'))
+    <div class="alert alert-danger">{{ session('error') }}</div>
+@endif
 
-<p class="text-muted mb-3">{{ __('ui.boundary.index_intro') }}</p>
+<p class="text-muted mb-3">{{ __('ui.police_stations.index_intro') }}</p>
 
 <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
@@ -23,25 +32,31 @@
             <button type="button" class="btn btn-outline-secondary map-filter-btn" data-filter="administrations">{{ __('ui.map_filter.administrations') }}</button>
         </div>
     </div>
-    <div id="boundary-overview-map" style="height:320px"></div>
+    <div id="stations-overview-map" style="height:340px"></div>
 </div>
 
-<div class="card">
+@foreach($administrations as $administration)
+<div class="card mb-3">
+    <div class="card-header">
+        <span class="card-title"><i class="fas fa-sitemap mr-1" style="color:var(--gold)"></i>{{ $administration->name }}</span>
+    </div>
     <div class="card-body p-0">
         <table class="table table-striped mb-0">
             <thead>
                 <tr>
-                    <th>{{ __('ui.boundary.station') }}</th>
-                    <th>{{ __('ui.boundary.administration') }}</th>
-                    <th>{{ __('ui.boundary.status') }}</th>
+                    <th>{{ __('ui.police_stations.name') }}</th>
+                    <th>{{ __('ui.police_stations.users_count') }}</th>
+                    <th>{{ __('ui.police_stations.drones_count') }}</th>
+                    <th>{{ __('ui.police_stations.boundary_status') }}</th>
                     <th>{{ __('ui.flights.actions') }}</th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($stations as $station)
+                @forelse($administration->stations as $station)
                 <tr>
                     <td><strong>{{ $station->name }}</strong></td>
-                    <td>{{ $station->administration->name ?? '—' }}</td>
+                    <td>{{ $station->users_count }}</td>
+                    <td>{{ $station->drones_count }}</td>
                     <td>
                         @if($station->hasBoundary())
                             <span class="badge badge-success"><i class="fas fa-draw-polygon mr-1"></i>{{ __('ui.boundary.status_drawn') }}</span>
@@ -53,15 +68,26 @@
                         <a href="{{ route('station-boundary.edit', $station) }}" class="btn btn-xs btn-warning">
                             <i class="fas fa-draw-polygon mr-1"></i>{{ __('ui.boundary.edit_boundary') }}
                         </a>
+                        @if(auth()->user()->station_id === null)
+                        <a href="{{ route('police-stations.edit', $station) }}" class="btn btn-xs btn-info">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form action="{{ route('police-stations.destroy', $station) }}" method="POST" style="display:inline"
+                            onsubmit="return confirm('{{ __('ui.are_you_sure') }}')">
+                            @csrf @method('DELETE')
+                            <button class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
+                        </form>
+                        @endif
                     </td>
                 </tr>
                 @empty
-                <tr><td colspan="4" class="text-center text-muted py-4">{{ __('ui.no_data') }}</td></tr>
+                <tr><td colspan="5" class="text-center text-muted py-3">{{ __('ui.police_stations.no_stations') }}</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 </div>
+@endforeach
 
 @endsection
 
@@ -74,22 +100,34 @@
 @endsection
 
 @php
-    $overviewStations = $stations->filter(fn($s) => $s->latitude)->map(fn($s) => [
-        'lat' => (float) $s->latitude, 'lon' => (float) $s->longitude,
-        'name' => $s->name, 'boundary' => $s->boundary,
-    ])->values();
-    $adminBoundaries = $stations->pluck('administration')->filter()->unique('id')
-        ->filter(fn($a) => $a->hasBoundary())
+    $palette = ['#f0c040', '#17a2b8', '#e0668c', '#8fce6a', '#7b8ff0', '#f0954a', '#a67bf0', '#5ac8c8'];
+    $mapStations = collect();
+    foreach ($administrations as $ai => $administration) {
+        $color = $palette[$ai % count($palette)];
+        foreach ($administration->stations as $station) {
+            if ($station->latitude === null) continue;
+            $mapStations->push([
+                'lat' => (float) $station->latitude,
+                'lon' => (float) $station->longitude,
+                'name' => $station->name,
+                'administration' => $administration->name,
+                'boundary' => $station->boundary,
+                'color' => $color,
+            ]);
+        }
+    }
+    $mapStations = $mapStations->values();
+    $adminBoundaries = $administrations->filter(fn($a) => $a->hasBoundary())
         ->map(fn($a) => ['name' => $a->name, 'boundary' => $a->boundary])->values();
 @endphp
 
 @section('js')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const overviewStations = @json($overviewStations);
+const mapStations = @json($mapStations);
 const adminBoundaries = @json($adminBoundaries);
 
-const overviewMap = L.map('boundary-overview-map', { zoomControl: true, scrollWheelZoom: false }).setView([45.1, 17.0], 8);
+const overviewMap = L.map('stations-overview-map', { zoomControl: true, scrollWheelZoom: false }).setView([45.1, 17.0], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
 }).addTo(overviewMap);
@@ -99,19 +137,19 @@ const stationsGroup = L.layerGroup().addTo(overviewMap);
 const adminGroup = L.layerGroup().addTo(overviewMap);
 const overviewLayers = [];
 
-overviewStations.forEach(st => {
+mapStations.forEach(st => {
     const layer = (st.boundary && st.boundary.length >= 3)
-        ? L.polygon(st.boundary, { color: '#f0c040', weight: 2, fillColor: '#f0c040', fillOpacity: 0.1 })
+        ? L.polygon(st.boundary, { color: st.color, weight: 2, fillColor: st.color, fillOpacity: 0.15 })
         : L.circle([st.lat, st.lon], {
             radius: TERRITORY_RADIUS_M,
-            color: '#17a2b8', weight: 1.5, dashArray: '5,5', opacity: 0.7, fillColor: '#17a2b8', fillOpacity: 0.05,
+            color: st.color, weight: 1.5, dashArray: '5,5', opacity: 0.8, fillColor: st.color, fillOpacity: 0.08,
         });
-    layer.bindTooltip(st.name, { direction: 'center' }).addTo(stationsGroup);
+    layer.bindPopup(`<strong>${st.name}</strong><br>${st.administration}`).addTo(stationsGroup);
     overviewLayers.push(layer);
 });
 
 // Administration (uprava) boundaries — drawn distinctly (thick magenta dashed
-// line) so they're never confused with station territories.
+// line, no per-station colour) so they're never confused with station territories.
 adminBoundaries.forEach(a => {
     const layer = L.polygon(a.boundary, { color: '#c026d3', weight: 4, dashArray: '10,6', fillOpacity: 0.02 })
         .bindTooltip(a.name, { direction: 'center' })

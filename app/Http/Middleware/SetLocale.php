@@ -71,6 +71,18 @@ class SetLocale
             ],
             ['header' => $t('structure_header'), 'can' => 'manage station boundary'],
             [
+                'text' => $t('police_administrations'),
+                'url'  => 'police-administrations',
+                'icon' => 'fas fa-sitemap',
+                'can'  => 'manage station boundary',
+            ],
+            [
+                'text' => $t('police_stations'),
+                'url'  => 'police-stations',
+                'icon' => 'fas fa-building',
+                'can'  => 'manage station boundary',
+            ],
+            [
                 'text' => $t('station_boundary'),
                 'url'  => 'station-boundary',
                 'icon' => 'fas fa-draw-polygon',

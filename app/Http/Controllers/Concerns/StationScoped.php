@@ -34,6 +34,19 @@ trait StationScoped
     }
 
     /**
+     * Abort unless the authenticated user is the global super admin
+     * (station_id === null). Used to gate organisational-structure changes
+     * (e.g. creating new stations) that shouldn't be delegated to
+     * administration-scoped admins.
+     */
+    protected function denyNonSuperAdmin(): void
+    {
+        if (auth()->user()->station_id !== null) {
+            abort(403, 'Samo super admin može upravljati ustrojstvom postaja.');
+        }
+    }
+
+    /**
      * Check whether a record's station falls within the current user's scope.
      */
     protected function inUserStation(?int $recordStationId): bool
@@ -46,6 +59,21 @@ trait StationScoped
         }
 
         return $recordStationId !== null && in_array($recordStationId, $stationIds, true);
+    }
+
+    /**
+     * Check whether an administration falls within the current user's scope
+     * (their own administration for admin/viewer, unrestricted for super admin).
+     */
+    protected function inUserAdministration(?int $administrationId): bool
+    {
+        $user = auth()->user();
+
+        if ($user->station_id === null) {
+            return true; // super admin
+        }
+
+        return $administrationId !== null && $administrationId === $user->station?->police_administration_id;
     }
 
     /**

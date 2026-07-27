@@ -411,6 +411,13 @@ select option { background-color: var(--navy-card); }
     color: var(--gold) !important;
 }
 
+/* --- Map layer filter buttons (stations / administrations / both) --- */
+.map-filter-btn.active {
+    background-color: var(--gold) !important;
+    border-color: var(--gold) !important;
+    color: var(--navy-dark) !important;
+}
+
 /* --- Footer --- */
 .main-footer {
     background-color: var(--navy-dark) !important;
