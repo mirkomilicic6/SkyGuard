@@ -5,7 +5,14 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    roc_auc_score, roc_curve, confusion_matrix, silhouette_score,
+)
 from dotenv import load_dotenv
 import os
 
@@ -581,4 +588,170 @@ def risk_grid(station_id: int = None, administration_id: int = None,
             "hr_bih": [list(p) for p in BORDER_HR_BIH],
             "hr_srb": [list(p) for p in BORDER_HR_SRB],
         },
+    }
+
+
+# ── Model diagnostics (dev mode) ──────────────────────────────────────────────
+FEATURE_NAMES = ["lat", "lon", "hour_sin", "hour_cos", "dow_sin", "dow_cos"]
+
+
+def _evaluate_model(model, X_train, y_train, w_train, X_test, y_test) -> dict:
+    """Fit one classifier and score it on held-out data. Not every estimator
+    (e.g. KNeighborsClassifier) accepts sample_weight, so that's tried first
+    and silently dropped if unsupported."""
+    try:
+        model.fit(X_train, y_train, sample_weight=w_train)
+    except TypeError:
+        model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+
+    metrics = {
+        "accuracy": round(float(accuracy_score(y_test, y_pred)), 3),
+        "precision": round(float(precision_score(y_test, y_pred, zero_division=0)), 3),
+        "recall": round(float(recall_score(y_test, y_pred, zero_division=0)), 3),
+        "f1": round(float(f1_score(y_test, y_pred, zero_division=0)), 3),
+        "roc_auc": round(float(roc_auc_score(y_test, y_proba)), 3) if len(set(y_test)) > 1 else None,
+    }
+
+    cm = confusion_matrix(y_test, y_pred, labels=[0, 1]).tolist()
+    metrics["confusion_matrix"] = {
+        "tn": int(cm[0][0]), "fp": int(cm[0][1]),
+        "fn": int(cm[1][0]), "tp": int(cm[1][1]),
+    }
+
+    if len(set(y_test)) > 1:
+        fpr, tpr, _ = roc_curve(y_test, y_proba)
+        if len(fpr) > 40:
+            idx = np.linspace(0, len(fpr) - 1, 40).astype(int)
+            fpr, tpr = fpr[idx], tpr[idx]
+        metrics["roc_curve"] = {
+            "fpr": [round(float(v), 4) for v in fpr],
+            "tpr": [round(float(v), 4) for v in tpr],
+        }
+
+    if hasattr(model, "feature_importances_"):
+        metrics["feature_importances"] = {
+            name: round(float(imp), 3)
+            for name, imp in zip(FEATURE_NAMES, model.feature_importances_)
+        }
+
+    return metrics
+
+
+@app.get("/model-metrics")
+def model_metrics(station_id: int = None, administration_id: int = None,
+                   eps_km: float = 2.0, min_samples: int = 3):
+    """
+    Development-only diagnostics: how well the risk model actually separates
+    real detections from random background on held-out data, plus DBSCAN
+    cluster quality. Not a substitute for the more rigorous evaluation
+    (proper cross-validation, temporal holdout) planned for the thesis phase —
+    this is a quick, always-available sanity gauge while the app is still
+    being built.
+    """
+    df = get_detections(station_id, administration_id)
+    if len(df) < 12:
+        return {"message": "Nedovoljno detekcija za izračun metrika (potrebno min. 12)"}
+
+    # --- Risk model (Random Forest) held-out evaluation -----------------------
+    lat_min, lat_max = float(df["latitude"].min()), float(df["latitude"].max())
+    lon_min, lon_max = float(df["longitude"].min()), float(df["longitude"].max())
+    pad_lat = max((lat_max - lat_min) * 0.2, 0.03)
+    pad_lon = max((lon_max - lon_min) * 0.2, 0.03)
+    bbox = (lat_min - pad_lat, lat_max + pad_lat, lon_min - pad_lon, lon_max + pad_lon)
+
+    pos_src = df.dropna(subset=["hour", "dow"])
+    rng = np.random.default_rng(42)
+    n_pos = len(pos_src)
+    n_bg = max(n_pos * 4, 300)
+
+    pos = pd.DataFrame({
+        "lat": pos_src["latitude"].astype(float),
+        "lon": pos_src["longitude"].astype(float),
+        "hour": pos_src["hour"].astype(float),
+        "dow": pos_src["dow"].astype(float),
+        "weight": 1 + pos_src["escalation_level"].astype(float) * 0.5,
+        "label": 1,
+    })
+    bg = pd.DataFrame({
+        "lat": rng.uniform(bbox[0], bbox[1], n_bg),
+        "lon": rng.uniform(bbox[2], bbox[3], n_bg),
+        "hour": rng.integers(0, 24, n_bg).astype(float),
+        "dow": rng.integers(1, 8, n_bg).astype(float),
+        "weight": 1.0,
+        "label": 0,
+    })
+    data = pd.concat([pos, bg], ignore_index=True)
+    X = _encode_time(data)
+    y = data["label"]
+    w = data["weight"]
+
+    risk_model = {"trained": False}
+    if n_pos >= 6:
+        X_train, X_test, y_train, y_test, w_train, _ = train_test_split(
+            X, y, w, test_size=0.25, random_state=42, stratify=y
+        )
+
+        # Linear/instance-based models (Logistic Regression, kNN) need scaled
+        # features — lat/lon (tens of degrees) would otherwise dwarf the
+        # [-1,1]-ranged sin/cos time features. Tree ensembles are scale-invariant
+        # so they keep training on the raw values.
+        scaler = StandardScaler().fit(X_train)
+        X_train_scaled = pd.DataFrame(scaler.transform(X_train), columns=X_train.columns, index=X_train.index)
+        X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns, index=X_test.index)
+
+        model_specs = [
+            ("random_forest", "Random Forest", False, lambda: RandomForestClassifier(
+                n_estimators=200, max_depth=8, min_samples_leaf=4, random_state=42, n_jobs=-1)),
+            ("gradient_boosting", "Gradient Boosting", False, lambda: GradientBoostingClassifier(
+                n_estimators=150, max_depth=3, random_state=42)),
+            ("logistic_regression", "Logistic Regression", True, lambda: LogisticRegression(max_iter=500)),
+            ("knn", "k-Nearest Neighbors", True, lambda: KNeighborsClassifier(n_neighbors=15)),
+        ]
+
+        models_result = {}
+        for key, label, needs_scaling, make_model in model_specs:
+            xtr = X_train_scaled if needs_scaling else X_train
+            xte = X_test_scaled if needs_scaling else X_test
+            models_result[key] = {
+                "label": label,
+                **_evaluate_model(make_model(), xtr, y_train, w_train, xte, y_test),
+            }
+
+        risk_model = {
+            "trained": True,
+            "n_positive": int(n_pos),
+            "n_background": int(n_bg),
+            "test_size": int(len(X_test)),
+            "models": models_result,
+        }
+    else:
+        risk_model["message"] = "Premalo detekcija za train/test podjelu (potrebno min. 6)"
+
+    # --- DBSCAN cluster quality -------------------------------------------------
+    coords = df[["latitude", "longitude"]].values.astype(float)
+    clustering = {"n_clusters": 0, "noise_ratio": None, "silhouette": None}
+    if len(coords) >= min_samples:
+        coords_rad = np.radians(coords)
+        eps_rad = eps_km / 6371.0
+        labels = DBSCAN(eps=eps_rad, min_samples=min_samples, metric="haversine").fit_predict(coords_rad)
+        n_clusters = len(set(labels) - {-1})
+        clustering["n_clusters"] = n_clusters
+        clustering["noise_ratio"] = round(float((labels == -1).mean()), 3)
+
+        mask = labels != -1
+        if n_clusters >= 2 and mask.sum() >= 3:
+            try:
+                clustering["silhouette"] = round(
+                    float(silhouette_score(coords_rad[mask], labels[mask], metric="haversine")), 3
+                )
+            except ValueError:
+                clustering["silhouette"] = None
+
+    return {
+        "trained_on": int(len(df)),
+        "risk_model": risk_model,
+        "clustering": clustering,
     }

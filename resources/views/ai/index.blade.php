@@ -224,6 +224,25 @@
 
 @endif
 
+@if($isSuperAdmin)
+{{-- ── Dev mode: model diagnostics (super admin only) ───────────────────── --}}
+<div class="db-card mb-4" style="border:1px dashed rgba(240,192,64,0.35)">
+    <div class="db-card-header">
+        <div>
+            <div class="db-card-title">
+                <i class="fas fa-flask mr-2" style="color:var(--gold)"></i>Developer mode — točnost modela
+                <span class="ai-dev-badge">DEV</span>
+            </div>
+            <div class="db-card-subtitle">Interna dijagnostika dok je aplikacija u izradi — brzi pokazatelj, ne zamjenjuje formalnu evaluaciju</div>
+        </div>
+        <div class="ml-auto" id="devMetricsStatus" style="font-size:.78rem;color:rgba(255,255,255,.5)">Učitavanje...</div>
+    </div>
+    <div class="db-card-body" id="devMetricsBody">
+        <p class="text-muted text-center py-4 mb-0">Učitavanje metrika...</p>
+    </div>
+</div>
+@endif
+
 @include('partials.ai-chat-widget')
 @endsection
 
@@ -271,6 +290,101 @@
 }
 .leaflet-popup-content-wrapper { background: #0d2460 !important; color: #fff !important; border-radius: 10px !important; }
 .leaflet-popup-tip { background: #0d2460 !important; }
+
+.ai-dev-badge {
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .5px;
+    color: #16305c;
+    background: var(--gold);
+    padding: 1px 7px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+.dev-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: .75rem;
+    margin-bottom: 1.2rem;
+}
+@media(max-width:992px){ .dev-metric-grid { grid-template-columns: repeat(3,1fr); } }
+@media(max-width:576px){ .dev-metric-grid { grid-template-columns: repeat(2,1fr); } }
+.dev-metric-tile {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 10px;
+    padding: .85rem .5rem;
+    text-align: center;
+}
+.dev-metric-value { font-size: 1.5rem; font-weight: 700; color: #fff; line-height: 1; }
+.dev-metric-label { font-size: .68rem; color: rgba(255,255,255,.45); text-transform: uppercase; letter-spacing: .4px; margin-top: .35rem; }
+.dev-importance-row { display:flex; align-items:center; gap:.6rem; margin-bottom:.45rem; }
+.dev-importance-name { width: 78px; flex-shrink:0; font-size:.75rem; color:rgba(255,255,255,.6); font-family:monospace; }
+.dev-importance-bar-bg { flex:1; height:10px; background:rgba(255,255,255,.06); border-radius:5px; overflow:hidden; }
+.dev-importance-bar { height:100%; background:linear-gradient(90deg,#f0c040,#fd7e14); border-radius:5px; }
+.dev-importance-val { width: 42px; text-align:right; font-size:.72rem; color:rgba(255,255,255,.5); }
+
+.dev-cm-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr 1fr;
+    gap: 4px;
+    align-items: stretch;
+}
+.dev-cm-axis {
+    font-size: .65rem;
+    color: rgba(255,255,255,.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: .25rem;
+}
+.dev-cm-cell {
+    border-radius: 8px;
+    padding: .9rem .5rem;
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #fff;
+    position: relative;
+}
+.dev-cm-cell span {
+    display: block;
+    font-size: .62rem;
+    font-weight: 600;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.55);
+    margin-top: .2rem;
+}
+.dev-cm-good { background: rgba(40,167,69,0.18); border: 1px solid rgba(40,167,69,0.35); }
+.dev-cm-bad  { background: rgba(220,53,69,0.18); border: 1px solid rgba(220,53,69,0.35); }
+
+.dev-compare-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.dev-compare-table th {
+    text-align: left;
+    padding: .5rem .7rem;
+    color: rgba(255,255,255,.45);
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.dev-compare-table td {
+    padding: .55rem .7rem;
+    color: rgba(255,255,255,.75);
+    border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.dev-compare-table td.dev-best {
+    color: var(--gold);
+    font-weight: 700;
+}
+.dev-model-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
 </style>
 @endsection
 
@@ -532,6 +646,164 @@ fetch('{{ route('ai.riskGrid') }}')
     .catch(() => {
         document.getElementById('riskGridStatus').textContent = 'Greška pri učitavanju';
     });
+
+@if($isSuperAdmin)
+// ── Dev mode: model comparison diagnostics ───────────────────────────────────
+const featureLabels = { lat: 'lat', lon: 'lon', hour_sin: 'sat (sin)', hour_cos: 'sat (cos)', dow_sin: 'dan (sin)', dow_cos: 'dan (cos)' };
+const modelColors = { random_forest: '#f0c040', gradient_boosting: '#fd7e14', logistic_regression: '#6f42c1', knn: '#0dcaf0' };
+
+fetch('{{ route('ai.devMetrics') }}')
+    .then(r => r.json())
+    .then(d => {
+        const status = document.getElementById('devMetricsStatus');
+        const body   = document.getElementById('devMetricsBody');
+
+        if (d.message) {
+            status.textContent = '';
+            body.innerHTML = `<p class="text-muted text-center py-4 mb-0">${d.message}</p>`;
+            return;
+        }
+
+        status.textContent = `Trenirano na ${d.trained_on} detekcija`;
+
+        const rm = d.risk_model || {};
+        const cl = d.clustering || {};
+
+        let html = '';
+
+        if (!rm.trained) {
+            html += `<p class="text-muted text-center py-2">${rm.message || 'Model nije treniran'}</p>`;
+        } else {
+            const models = rm.models || {};
+            const entries = Object.entries(models);
+
+            // Best value per metric → bolded/highlighted in the table.
+            const bestOf = (metric) => Math.max(...entries.map(([,m]) => m[metric] ?? -1));
+
+            html += `<div style="font-size:.72rem;color:rgba(255,255,255,.4);margin-bottom:.9rem">
+                Usporedba 4 algoritma na istom izdvojenom test skupu · ${rm.n_positive} stvarnih detekcija + ${rm.n_background} nasumičnih (background) uzoraka · test skup: ${rm.test_size}
+            </div>`;
+
+            html += `<div class="table-responsive mb-4"><table class="dev-compare-table">
+                <thead><tr>
+                    <th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th>
+                </tr></thead><tbody>`;
+            entries.forEach(([key, m]) => {
+                const fmt = (metric, isAuc=false) => {
+                    const v = m[metric];
+                    const txt = isAuc ? (v !== null ? v.toFixed(3) : '—') : (v*100).toFixed(1) + '%';
+                    const isBest = v === bestOf(metric);
+                    return `<td${isBest ? ' class="dev-best"' : ''}>${txt}</td>`;
+                };
+                html += `<tr>
+                    <td><span class="dev-model-dot" style="background:${modelColors[key] || '#999'}"></span>${m.label}</td>
+                    ${fmt('accuracy')}${fmt('precision')}${fmt('recall')}${fmt('f1')}${fmt('roc_auc', true)}
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+
+            html += `<div class="ai-label" style="margin-bottom:.5rem">ROC krivulje — usporedba modela</div>
+                <canvas id="rocChart" height="110" class="mb-4"></canvas>`;
+
+            // Feature importance — only tree-based models expose this.
+            const withFi = entries.filter(([,m]) => m.feature_importances);
+            if (withFi.length) {
+                html += `<div class="row mb-2">`;
+                withFi.forEach(([key, m]) => {
+                    const fi = Object.entries(m.feature_importances).sort((a,b) => b[1]-a[1]);
+                    const max = Math.max(...fi.map(e => e[1]), 0.001);
+                    html += `<div class="col-md-6 mb-3">
+                        <div class="ai-label" style="margin-bottom:.5rem">${m.label} — važnost značajki</div>`;
+                    fi.forEach(([k,v]) => {
+                        html += `<div class="dev-importance-row">
+                            <div class="dev-importance-name">${featureLabels[k] || k}</div>
+                            <div class="dev-importance-bar-bg"><div class="dev-importance-bar" style="width:${(v/max*100).toFixed(0)}%;background:linear-gradient(90deg,${modelColors[key]},#fd7e14)"></div></div>
+                            <div class="dev-importance-val">${(v*100).toFixed(0)}%</div>
+                        </div>`;
+                    });
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            }
+
+            // Confusion matrix — best model by ROC-AUC, to keep the panel readable.
+            const bestKey = entries.reduce((a,b) => (b[1].roc_auc ?? -1) > (a[1].roc_auc ?? -1) ? b : a)[0];
+            const bestModel = models[bestKey];
+            if (bestModel?.confusion_matrix) {
+                const cm = bestModel.confusion_matrix;
+                html += `<div class="ai-label" style="margin:.5rem 0">Matrica konfuzije — najbolji model (${bestModel.label})</div>
+                    <div class="dev-cm-grid" style="max-width:420px">
+                        <div></div>
+                        <div class="dev-cm-axis">Predviđeno: pozadina</div>
+                        <div class="dev-cm-axis">Predviđeno: detekcija</div>
+                        <div class="dev-cm-axis" style="text-align:right;padding-right:.5rem">Stvarno: pozadina</div>
+                        <div class="dev-cm-cell dev-cm-good">${cm.tn}<span>TN</span></div>
+                        <div class="dev-cm-cell dev-cm-bad">${cm.fp}<span>FP</span></div>
+                        <div class="dev-cm-axis" style="text-align:right;padding-right:.5rem">Stvarno: detekcija</div>
+                        <div class="dev-cm-cell dev-cm-bad">${cm.fn}<span>FN</span></div>
+                        <div class="dev-cm-cell dev-cm-good">${cm.tp}<span>TP</span></div>
+                    </div>`;
+            }
+        }
+
+        html += `<hr style="border-color:rgba(255,255,255,.08);margin:1.2rem 0">
+            <div class="ai-label" style="margin-bottom:.5rem">DBSCAN kvaliteta klastera</div>
+            <div class="dev-metric-grid" style="grid-template-columns:repeat(3,1fr)">
+                <div class="dev-metric-tile"><div class="dev-metric-value">${cl.n_clusters ?? '—'}</div><div class="dev-metric-label">Klastera</div></div>
+                <div class="dev-metric-tile"><div class="dev-metric-value">${cl.noise_ratio !== null ? (cl.noise_ratio*100).toFixed(0)+'%' : '—'}</div><div class="dev-metric-label">Šum</div></div>
+                <div class="dev-metric-tile"><div class="dev-metric-value">${cl.silhouette !== null ? cl.silhouette.toFixed(2) : '—'}</div><div class="dev-metric-label">Silhouette</div></div>
+            </div>`;
+
+        body.innerHTML = html;
+
+        if (rm.trained && rm.models) {
+            const datasets = Object.entries(rm.models)
+                .filter(([,m]) => m.roc_curve)
+                .map(([key, m]) => ({
+                    label: `${m.label} (AUC ${m.roc_auc?.toFixed(2) ?? '—'})`,
+                    data: m.roc_curve.fpr.map((f, i) => ({ x: f, y: m.roc_curve.tpr[i] })),
+                    borderColor: modelColors[key] || '#999',
+                    backgroundColor: 'transparent',
+                    tension: 0.15,
+                    pointRadius: 0,
+                    borderWidth: 2,
+                }));
+            datasets.push({
+                label: 'Slučajno pogađanje',
+                data: [{x:0,y:0},{x:1,y:1}],
+                borderColor: 'rgba(255,255,255,0.25)',
+                borderDash: [4,4],
+                pointRadius: 0,
+                borderWidth: 1,
+                fill: false,
+            });
+
+            new Chart(document.getElementById('rocChart'), {
+                type: 'line',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: 'rgba(255,255,255,.6)', font:{size:10}, boxWidth: 14 } },
+                        tooltip: {
+                            backgroundColor: '#0d2460', borderColor: 'rgba(240,192,64,0.4)', borderWidth: 1,
+                            titleColor: '#f0c040', bodyColor: 'rgba(255,255,255,0.8)',
+                            callbacks: { label: item => `${item.dataset.label}: FPR ${item.raw.x.toFixed(2)} · TPR ${item.raw.y.toFixed(2)}` }
+                        },
+                    },
+                    scales: {
+                        x: { type:'linear', min:0, max:1, title:{display:true,text:'False Positive Rate',color:'rgba(255,255,255,.4)',font:{size:10}}, ticks:{color:'rgba(255,255,255,.4)',font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} },
+                        y: { type:'linear', min:0, max:1, title:{display:true,text:'True Positive Rate',color:'rgba(255,255,255,.4)',font:{size:10}}, ticks:{color:'rgba(255,255,255,.4)',font:{size:9}}, grid:{color:'rgba(255,255,255,.04)'} },
+                    },
+                }
+            });
+        }
+    })
+    .catch(() => {
+        document.getElementById('devMetricsStatus').textContent = '';
+        document.getElementById('devMetricsBody').innerHTML = '<p class="text-muted text-center py-4 mb-0">Greška pri učitavanju metrika</p>';
+    });
+@endif
 </script>
 @endif
 @endsection

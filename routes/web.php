@@ -59,6 +59,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('ai', [AiController::class, 'index'])->name('ai.index');
     Route::get('ai/predict', [AiController::class, 'predict'])->name('ai.predict');
     Route::get('ai/risk-grid', [AiController::class, 'riskGrid'])->name('ai.riskGrid');
+    Route::get('ai/dev-metrics', [AiController::class, 'devMetrics'])->name('ai.devMetrics');
     Route::post('chat', [ChatController::class, 'respond'])->name('chat.respond');
 
     // ── Maintenance — all auth; workflow transitions: admin only ──────────────

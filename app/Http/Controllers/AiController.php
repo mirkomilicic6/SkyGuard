@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\StationScoped;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 class AiController extends Controller
 {
+    use StationScoped;
+
     private string $base = 'http://127.0.0.1:8001';
 
     public function index()
@@ -34,7 +37,27 @@ class AiController extends Controller
             $mlOnline = false;
         }
 
-        return view('ai.index', compact('clusters', 'riskMatrix', 'insights', 'mlOnline'));
+        $isSuperAdmin = $stationId === null;
+
+        return view('ai.index', compact('clusters', 'riskMatrix', 'insights', 'mlOnline', 'isSuperAdmin'));
+    }
+
+    /**
+     * Dev-mode model diagnostics: held-out accuracy/precision/recall/ROC-AUC
+     * for the risk-grid Random Forest, feature importances, and DBSCAN
+     * cluster-quality (silhouette, noise ratio). Super admin only — this is
+     * a development/build-time gauge, not a production feature.
+     */
+    public function devMetrics()
+    {
+        $this->denyNonSuperAdmin();
+
+        try {
+            $result = Http::timeout(20)->get("{$this->base}/model-metrics")->json();
+            return response()->json($result);
+        } catch (\Throwable) {
+            return response()->json(['message' => 'ML servis nedostupan'], 503);
+        }
     }
 
     public function predict(Request $request)
