@@ -30,63 +30,63 @@ class SavaFlightSeeder extends Seeder
     private array $hotspots = [
         // Slavonski Brod area
         ['lat' => 45.1620, 'lon' => 17.9680, 'types' => ['person', 'group']],
-        ['lat' => 45.1590, 'lon' => 17.9820, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 45.1590, 'lon' => 17.9820, 'types' => ['vehicle']],
         ['lat' => 45.1555, 'lon' => 17.9950, 'types' => ['person']],
         ['lat' => 45.1530, 'lon' => 18.0120, 'types' => ['group', 'person']],
-        ['lat' => 45.1570, 'lon' => 18.0340, 'types' => ['smuggling']],
+        ['lat' => 45.1570, 'lon' => 18.0340, 'types' => ['other']],
         ['lat' => 45.1540, 'lon' => 18.0610, 'types' => ['person', 'vehicle']],
         ['lat' => 45.1510, 'lon' => 18.0750, 'types' => ['group']],
         ['lat' => 45.1480, 'lon' => 18.0880, 'types' => ['person', 'other']],
         // Oprisavci / Brodska Varoš
         ['lat' => 45.1450, 'lon' => 18.1080, 'types' => ['person']],
-        ['lat' => 45.1430, 'lon' => 18.1230, 'types' => ['smuggling', 'vehicle']],
+        ['lat' => 45.1430, 'lon' => 18.1230, 'types' => ['vehicle']],
         ['lat' => 45.1400, 'lon' => 18.1380, 'types' => ['group', 'person']],
         ['lat' => 45.1370, 'lon' => 18.1520, 'types' => ['person']],
         ['lat' => 45.1345, 'lon' => 18.1680, 'types' => ['vehicle']],
         // Velika Kopanica — Donji Andrijevci
         ['lat' => 45.1420, 'lon' => 18.1880, 'types' => ['person', 'group']],
-        ['lat' => 45.1390, 'lon' => 18.2050, 'types' => ['smuggling']],
+        ['lat' => 45.1390, 'lon' => 18.2050, 'types' => ['other']],
         ['lat' => 45.1360, 'lon' => 18.2220, 'types' => ['person']],
         ['lat' => 45.1330, 'lon' => 18.2400, 'types' => ['group', 'vehicle']],
-        ['lat' => 45.1310, 'lon' => 18.2570, 'types' => ['person', 'smuggling']],
+        ['lat' => 45.1310, 'lon' => 18.2570, 'types' => ['person']],
         // Vrpolje — Đurići
         ['lat' => 45.1450, 'lon' => 18.3120, 'types' => ['person']],
         ['lat' => 45.1430, 'lon' => 18.3300, 'types' => ['group']],
-        ['lat' => 45.1460, 'lon' => 18.3540, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 45.1460, 'lon' => 18.3540, 'types' => ['vehicle']],
         ['lat' => 45.1470, 'lon' => 18.3760, 'types' => ['person', 'group']],
         ['lat' => 45.1450, 'lon' => 18.3990, 'types' => ['person']],
-        ['lat' => 45.1430, 'lon' => 18.4180, 'types' => ['smuggling', 'other']],
+        ['lat' => 45.1430, 'lon' => 18.4180, 'types' => ['other']],
         // Slavonski Šamac prijelaz (most)
         ['lat' => 45.0720, 'lon' => 18.4480, 'types' => ['vehicle', 'person']],
-        ['lat' => 45.0640, 'lon' => 18.4620, 'types' => ['group', 'smuggling']],
+        ['lat' => 45.0640, 'lon' => 18.4620, 'types' => ['group']],
         ['lat' => 45.0570, 'lon' => 18.4780, 'types' => ['person']],
         ['lat' => 45.0510, 'lon' => 18.4930, 'types' => ['vehicle']],
         // Babina Greda
         ['lat' => 45.0880, 'lon' => 18.5080, 'types' => ['person', 'group']],
-        ['lat' => 45.0840, 'lon' => 18.5250, 'types' => ['smuggling']],
+        ['lat' => 45.0840, 'lon' => 18.5250, 'types' => ['other']],
         ['lat' => 45.0800, 'lon' => 18.5440, 'types' => ['person']],
         ['lat' => 45.0750, 'lon' => 18.5620, 'types' => ['group', 'vehicle']],
         // Rajevo Selo — Štitar
         ['lat' => 45.0350, 'lon' => 18.5920, 'types' => ['person']],
-        ['lat' => 45.0280, 'lon' => 18.6120, 'types' => ['smuggling', 'person']],
+        ['lat' => 45.0280, 'lon' => 18.6120, 'types' => ['person']],
         ['lat' => 45.0200, 'lon' => 18.6290, 'types' => ['group']],
-        ['lat' => 45.0130, 'lon' => 18.6480, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 45.0130, 'lon' => 18.6480, 'types' => ['vehicle']],
         // Županja
         ['lat' => 44.9840, 'lon' => 18.6720, 'types' => ['person', 'group']],
         ['lat' => 44.9760, 'lon' => 18.6870, 'types' => ['person']],
-        ['lat' => 44.9680, 'lon' => 18.7020, 'types' => ['smuggling']],
+        ['lat' => 44.9680, 'lon' => 18.7020, 'types' => ['other']],
         ['lat' => 44.9600, 'lon' => 18.7180, 'types' => ['vehicle', 'person']],
         // Strošinci — Drenovci
         ['lat' => 44.9530, 'lon' => 18.7480, 'types' => ['group', 'person']],
-        ['lat' => 44.9450, 'lon' => 18.7670, 'types' => ['smuggling', 'vehicle']],
+        ['lat' => 44.9450, 'lon' => 18.7670, 'types' => ['vehicle']],
         ['lat' => 44.9370, 'lon' => 18.7850, 'types' => ['person']],
         ['lat' => 44.9290, 'lon' => 18.8020, 'types' => ['group']],
         // Gunja
         ['lat' => 44.9180, 'lon' => 18.8220, 'types' => ['person', 'vehicle']],
-        ['lat' => 44.9100, 'lon' => 18.8380, 'types' => ['smuggling', 'group']],
+        ['lat' => 44.9100, 'lon' => 18.8380, 'types' => ['group']],
         ['lat' => 44.9030, 'lon' => 18.8510, 'types' => ['person']],
         ['lat' => 44.8960, 'lon' => 18.8650, 'types' => ['vehicle', 'other']],
-        ['lat' => 44.8890, 'lon' => 18.8780, 'types' => ['group', 'smuggling']],
+        ['lat' => 44.8890, 'lon' => 18.8780, 'types' => ['group']],
         ['lat' => 44.8820, 'lon' => 18.8900, 'types' => ['person']],
     ];
 
@@ -222,14 +222,16 @@ class SavaFlightSeeder extends Seeder
             $lon = $hotspot['lon'] + (rand(-50, 50) / 100000);
 
             Detection::create([
-                'flight_id'   => $flight->id,
-                'user_id'     => $userId,
-                'latitude'    => round($lat, 7),
-                'longitude'   => round($lon, 7),
-                'type'        => $type,
-                'count'       => $this->randomCount($type),
-                'notes'       => $this->randomNote($type),
-                'detected_at' => $flightDate->copy()->addMinutes(rand(5, 30)),
+                'flight_id'      => $flight->id,
+                'station_id'     => $flight->station_id,
+                'created_by'     => $userId,
+                'source'         => 'drone',
+                'latitude'       => round($lat, 7),
+                'longitude'      => round($lon, 7),
+                'detection_type' => $type,
+                'entity_count'   => $this->randomCount($type),
+                'note'           => $this->randomNote($type),
+                'detected_at'    => $flightDate->copy()->addMinutes(rand(5, 30)),
             ]);
         }
     }
@@ -237,22 +239,20 @@ class SavaFlightSeeder extends Seeder
     private function randomCount(string $type): int
     {
         return match($type) {
-            'person'    => rand(1, 3),
-            'group'     => rand(4, 12),
-            'vehicle'   => rand(1, 2),
-            'smuggling' => rand(1, 4),
-            default     => 1,
+            'person'  => rand(1, 3),
+            'group'   => rand(4, 12),
+            'vehicle' => rand(1, 2),
+            default   => 1,
         };
     }
 
     private function randomNote(string $type): ?string
     {
         $notes = match($type) {
-            'person'    => ['Kretanje uz obalu Save', 'Prijelaz čamcem', 'Skriva se u trski', null, null],
-            'group'     => ['Veća skupina uz riječnu obalu', 'Kretanje prema cesti', 'Tabor uz šumski pojas', null],
-            'vehicle'   => ['Tamni kombi bez tablica', 'Vozilo uz nasip Save', 'Noćno kretanje uz rijeku', null, null],
-            'smuggling' => ['Ruksaci vidljivi', 'Predaja robe uz obalu', 'Sumnjivi transfer blizu nasipa', null],
-            default     => [null, null, 'Neidentificirana aktivnost uz Savu'],
+            'person'  => ['Kretanje uz obalu Save', 'Prijelaz čamcem', 'Skriva se u trski', null, null],
+            'group'   => ['Veća skupina uz riječnu obalu', 'Kretanje prema cesti', 'Tabor uz šumski pojas', null],
+            'vehicle' => ['Tamni kombi bez tablica', 'Vozilo uz nasip Save', 'Noćno kretanje uz rijeku', null, null],
+            default   => [null, null, 'Neidentificirana aktivnost uz Savu'],
         };
         return $notes[array_rand($notes)];
     }

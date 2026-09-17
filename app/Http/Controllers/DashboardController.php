@@ -11,6 +11,7 @@ use App\Models\Flight;
 use App\Models\GpxPoint;
 use App\Models\HuntingCamera;
 use App\Models\MaintenanceLog;
+use App\Models\PoliceAdministration;
 use App\Models\User;
 use App\Services\WeatherService;
 use Illuminate\Http\Request;
@@ -29,6 +30,11 @@ class DashboardController extends Controller
         }
 
         $isSupervisor = $user->hasRole(['admin', 'viewer']);
+        $isSuperAdmin = $user->station_id === null;
+
+        $administrations = $isSuperAdmin
+            ? PoliceAdministration::with('stations')->orderBy('name')->get()
+            : null;
 
         // Base query: supervisor sees all station flights, pilot sees own only
         $flightBase = $isSupervisor
@@ -54,11 +60,9 @@ class DashboardController extends Controller
                 ? $this->applyStationScope(User::role('pilot'))->count()
                 : User::role('pilot')->count(),
             'total_detections'   => Detection::query()
-                ->when($user->station_id, fn($q) =>
-                    $q->whereHas('flight', fn($fq) => $fq->where('station_id', $user->station_id))
-                )
+                ->when($user->station_id, fn($q) => $q->where('station_id', $user->station_id))
                 ->when(!$isSupervisor && !$user->station_id, fn($q) =>
-                    $q->where('user_id', $user->id)
+                    $q->where('created_by', $user->id)
                 )
                 ->count(),
         ];
@@ -146,8 +150,118 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'stats', 'recentFlights', 'monthlyFlights', 'heatmapPoints',
             'dateFrom', 'dateTo', 'chartYear', 'availableYears',
-            'activeCheckout', 'assignedDrones', 'pendingReview',
-        ) + ['isAdmin' => $isSupervisor]);
+            'activeCheckout', 'assignedDrones', 'pendingReview', 'administrations',
+        ) + ['isAdmin' => $isSupervisor, 'isSuperAdmin' => $isSuperAdmin]);
+    }
+
+    /**
+     * Network-wide overview map, super admin only: detections, flight
+     * routes, hunting camera locations, and station/administration
+     * boundaries as independently toggleable layers (see resources/views/
+     * dashboard.blade.php). Deliberately its own endpoint rather than
+     * reusing AnalyticsController::spatialData() — that one is scoped to
+     * the caller's own station/administration and doesn't carry cameras or
+     * administration boundaries, both needed here.
+     */
+    public function overviewMapData(Request $request)
+    {
+        $user = auth()->user();
+        abort_unless($user->station_id === null, 403);
+
+        $stationId = $request->filled('station_id') ? $request->integer('station_id') : null;
+        $administrationId = $request->filled('administration_id') ? $request->integer('administration_id') : null;
+
+        // A station implies its own administration, so the administration-
+        // level boundary layer stays consistent even when only a station
+        // was picked in the cascading filter.
+        if ($stationId && !$administrationId) {
+            $administrationId = BorderPoliceStation::find($stationId)?->police_administration_id;
+        }
+
+        $detections = Detection::query()
+            ->when($stationId, fn($q) => $q->where('station_id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) =>
+                $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
+            )
+            ->when($request->filled('date_from'), fn($q) => $q->whereDate('detected_at', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('detected_at', '<=', $request->date('date_to')))
+            ->when($request->filled('detection_type'), fn($q) => $q->where('detection_type', $request->string('detection_type')))
+            ->when($request->filled('source'), fn($q) => $q->where('source', $request->string('source')))
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->get(['latitude', 'longitude', 'entity_count', 'detection_type', 'source', 'detected_at']);
+
+        $points = $detections->map(fn($d) => [
+            'lat'            => (float) $d->latitude,
+            'lon'            => (float) $d->longitude,
+            'entity_count'   => (int) $d->entity_count,
+            'detection_type' => $d->detection_type,
+            'source'         => $d->source,
+            'detected_at'    => $d->detected_at->translatedFormat('d.m.Y H:i'),
+        ])->values();
+
+        // Routes: date/station-scoped only — type/source are detection-level
+        // attributes and don't apply to a whole flight.
+        $routes = Flight::query()
+            ->when($stationId, fn($q) => $q->where('station_id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) =>
+                $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
+            )
+            ->when($request->filled('date_from'), fn($q) => $q->whereDate('flight_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('flight_date', '<=', $request->date('date_to')))
+            ->with(['gpxPoints' => fn($q) => $q->orderBy('point_order')->select('id', 'flight_id', 'latitude', 'longitude')])
+            ->get()
+            ->map(fn($f) => $f->gpxPoints->map(fn($p) => [(float) $p->latitude, (float) $p->longitude])->values())
+            ->filter(fn($pts) => $pts->count() > 1)
+            ->values();
+
+        $cameras = HuntingCamera::query()
+            ->when($stationId, fn($q) => $q->where('station_id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) =>
+                $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
+            )
+            ->with('station')
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->get()
+            ->map(fn($c) => [
+                'lat'           => (float) $c->latitude,
+                'lon'           => (float) $c->longitude,
+                'name'          => $c->name,
+                'location_name' => $c->location_name,
+                'is_active'     => (bool) $c->is_active,
+                'station_name'  => $c->station->name ?? null,
+            ])->values();
+
+        $stations = BorderPoliceStation::query()
+            ->when($stationId, fn($q) => $q->where('id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) => $q->where('police_administration_id', $administrationId))
+            ->with('administration')
+            ->get()
+            ->map(fn($s) => [
+                'id'                  => $s->id,
+                'name'                => $s->name,
+                'lat'                 => (float) $s->latitude,
+                'lon'                 => (float) $s->longitude,
+                'administration_name' => $s->administration->name ?? null,
+                'boundary'            => $s->hasBoundary() ? $s->boundary : null,
+                'radius_km'           => BorderPoliceStation::TERRITORY_RADIUS_KM,
+            ])->values();
+
+        $administrationAreas = PoliceAdministration::query()
+            ->when($administrationId, fn($q) => $q->where('id', $administrationId))
+            ->get()
+            ->map(fn($a) => [
+                'id'       => $a->id,
+                'name'     => $a->name,
+                'boundary' => $a->hasBoundary() ? $a->boundary : null,
+            ])->values();
+
+        return response()->json([
+            'points'          => $points,
+            'routes'          => $routes,
+            'cameras'         => $cameras,
+            'stations'        => $stations,
+            'administrations' => $administrationAreas,
+        ]);
     }
 
     private function pilotHome(User $user, WeatherService $weather)

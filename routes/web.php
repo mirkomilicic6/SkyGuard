@@ -11,6 +11,7 @@ use App\Http\Controllers\DetectionController;
 use App\Http\Controllers\DroneCheckoutController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\SearchController;
@@ -32,6 +33,7 @@ Route::get('language/{locale}', function (string $locale) {
 Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('dashboard/overview-map', [DashboardController::class, 'overviewMapData'])->name('dashboard.overviewMap');
 
     // ── Drones — index/show: all auth; create/edit/delete: admin only ─────────
     // NOTE: 'drones/create' must be registered before the 'drones/{drone}' wildcard,
@@ -56,10 +58,19 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Analytics ─────────────────────────────────────────────────────────────
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('analytics/spatial-data', [AnalyticsController::class, 'spatialData'])->name('analytics.spatialData');
+    Route::get('recommendations/dbscan-zones', [RecommendationController::class, 'dbscanZones'])->name('recommendations.dbscanZones');
     Route::get('ai', [AiController::class, 'index'])->name('ai.index');
     Route::get('ai/predict', [AiController::class, 'predict'])->name('ai.predict');
     Route::get('ai/risk-grid', [AiController::class, 'riskGrid'])->name('ai.riskGrid');
-    Route::get('ai/dev-metrics', [AiController::class, 'devMetrics'])->name('ai.devMetrics');
+    Route::get('analiza-snimke', [AiController::class, 'footageAnalysis'])->name('ai.footageAnalysis');
+    Route::get('ai/clusters', [AiController::class, 'clusters'])->name('ai.clusters');
+    Route::get('akademski-prikaz', [AiController::class, 'academic'])->name('academic.index');
+    Route::get('ai/zones/flight-stats', [AiController::class, 'zoneFlightStats'])->name('ai.zoneFlightStats');
+    Route::get('ai/zones/dataset-preview', [AiController::class, 'zoneDatasetPreview'])->name('ai.zoneDatasetPreview');
+    Route::get('ai/zone-model-metrics', [AiController::class, 'zoneModelMetrics'])->name('ai.zoneModelMetrics');
+    Route::get('ai/zone-predictions', [AiController::class, 'zonePredictions'])->name('ai.zonePredictions');
+    Route::get('ai/asistent', [ChatController::class, 'page'])->name('chat.page');
     Route::post('chat', [ChatController::class, 'respond'])->name('chat.respond');
 
     // ── Maintenance — all auth; workflow transitions: admin only ──────────────

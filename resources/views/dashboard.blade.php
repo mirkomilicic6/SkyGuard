@@ -254,8 +254,10 @@
 @endif
 
 {{-- ================================================================
-     HEATMAP
+     HEATMAP (admin/viewer/pilot) — super admin gets the fuller
+     "Pregled cijele mreže" card below instead.
      ================================================================ --}}
+@if(!$isSuperAdmin)
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -279,6 +281,88 @@
         @endif
     </div>
 </div>
+@else
+{{-- ================================================================
+     SUPER ADMIN: network-wide overview map
+     Filters (uprava/postaja, datum, vrsta, izvor) + toggleable layers:
+     heatmapa, detekcije, letovi, kamere, postaje, granice uprava.
+     ================================================================ --}}
+<div class="db-card mb-4">
+    <div class="db-card-header">
+        <div>
+            <div class="db-card-title">
+                <i class="fas fa-globe-europe mr-2" style="color:#f46d43"></i>Pregled cijele mreže
+            </div>
+            <div class="db-card-subtitle" id="ovmFilteredCount">Učitavanje...</div>
+        </div>
+    </div>
+
+    {{-- Filters ------------------------------------------------------------ --}}
+    <div class="ovm-filters">
+        <select id="ovmAdministration" class="form-control form-control-sm">
+            <option value="">— Sva uprava —</option>
+            @foreach($administrations as $adm)
+                <option value="{{ $adm->id }}"
+                    data-stations="{{ $adm->stations->map(fn($s)=>['id'=>$s->id,'name'=>$s->name])->toJson() }}">
+                    {{ $adm->name }}
+                </option>
+            @endforeach
+        </select>
+        <select id="ovmStation" class="form-control form-control-sm">
+            <option value="">— Sve postaje —</option>
+            @foreach($administrations->flatMap->stations as $st)
+                <option value="{{ $st->id }}" data-admin="{{ $st->police_administration_id }}">{{ $st->name }}</option>
+            @endforeach
+        </select>
+
+        <input type="date" id="ovmDateFrom" class="form-control form-control-sm" title="Datum od">
+        <input type="date" id="ovmDateTo" class="form-control form-control-sm" title="Datum do">
+
+        <select id="ovmType" class="form-control form-control-sm">
+            <option value="">— Sve vrste —</option>
+            <option value="person">Osoba</option>
+            <option value="group">Grupa</option>
+            <option value="vehicle">Vozilo</option>
+            <option value="other">Ostalo</option>
+        </select>
+
+        <select id="ovmSource" class="form-control form-control-sm">
+            <option value="">— Svi izvori —</option>
+            <option value="drone">Dron</option>
+            <option value="trail_camera">Kamera</option>
+            <option value="ground_observation">Ručno (teren)</option>
+            <option value="other">Ostalo</option>
+        </select>
+
+        <button id="ovmApply" class="btn btn-sm btn-primary"><i class="fas fa-filter mr-1"></i>Primijeni</button>
+        <button id="ovmReset" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></button>
+    </div>
+
+    {{-- Layer toggles -------------------------------------------------------- --}}
+    <div class="ovm-layers">
+        <label><input type="checkbox" id="ovmLayerHeat" checked> Heatmapa letova</label>
+        <label><input type="checkbox" id="ovmLayerPoints"> Detekcije</label>
+        <label><input type="checkbox" id="ovmLayerRoutes"> Letovi (GPX)</label>
+        <label><input type="checkbox" id="ovmLayerCameras"> Lovačke kamere</label>
+        <label><input type="checkbox" id="ovmLayerStations"> Postaje</label>
+        <label><input type="checkbox" id="ovmLayerAdmins"> Granice uprava</label>
+    </div>
+
+    <div style="position:relative">
+        <div id="overviewMap" style="height:480px; border-radius:0 0 12px 12px;"></div>
+    </div>
+
+    {{-- Legend ---------------------------------------------------------------- --}}
+    <div class="ovm-legend">
+        <span><i class="ovm-legend-dot" style="background:#fd7e14"></i>Osoba</span>
+        <span><i class="ovm-legend-dot" style="background:#dc3545"></i>Grupa</span>
+        <span><i class="ovm-legend-dot" style="background:#0d6efd"></i>Vozilo</span>
+        <span><i class="ovm-legend-dot" style="background:#6c757d"></i>Ostalo</span>
+        <span><i class="ovm-legend-dot" style="background:#20c997"></i>Kamera</span>
+        <span><i class="ovm-legend-dot" style="background:#f0c040"></i>Postaja</span>
+    </div>
+</div>
+@endif
 
 {{-- ================================================================
      RECENT FLIGHTS
@@ -508,6 +592,31 @@
 }
 .db-view-btn:hover { background: rgba(23,162,184,0.3); color: #fff; text-decoration: none; }
 
+/* ── SUPER ADMIN OVERVIEW MAP ────────────────────────────────── */
+.ovm-filters {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+    padding: .6rem 1.2rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.ovm-filters select, .ovm-filters input { width: auto; }
+.ovm-layers {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+    padding: .6rem 1.2rem;
+    background: rgba(255,255,255,0.02);
+}
+.ovm-layers label {
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .8rem; color: rgba(255,255,255,0.6); margin: 0;
+}
+.ovm-legend {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+    padding: .6rem 1.2rem;
+    font-size: .75rem; color: rgba(255,255,255,0.5);
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.ovm-legend span { display: flex; align-items: center; gap: .35rem; }
+.ovm-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+
 /* ── CHECKOUT WIDGET ─────────────────────────────────────────── */
 .db-checkout-active {
     display: flex;
@@ -591,7 +700,7 @@
 
 @section('js')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-@if(count($heatmapPoints) > 0)
+@if(!$isSuperAdmin && count($heatmapPoints) > 0)
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 @php
@@ -611,6 +720,167 @@ L.heatLayer(heatData, {
     radius: 20, blur: 25, maxZoom: 17,
     gradient: { 0.2:'#4575b4', 0.45:'#74add1', 0.65:'#fdae61', 0.82:'#f46d43', 1.0:'#d73027' }
 }).addTo(map);
+</script>
+@endif
+@if($isSuperAdmin)
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+// ── Super admin: network-wide overview map ─────────────────────────────────
+const overviewMap = L.map('overviewMap').setView([45.1, 18.0], 8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19
+}).addTo(overviewMap);
+
+let ovmData = { points: [], routes: [], cameras: [], stations: [], administrations: [] };
+let ovmHeatLayer = null;
+const ovmPointsGroup   = L.layerGroup();
+const ovmRoutesGroup   = L.layerGroup();
+const ovmCamerasGroup  = L.layerGroup();
+const ovmStationsGroup = L.layerGroup();
+const ovmAdminsGroup   = L.layerGroup();
+
+const ovmTypeColors = { person: '#fd7e14', group: '#dc3545', vehicle: '#0d6efd', other: '#6c757d' };
+
+function ovmRenderHeat() {
+    if (ovmHeatLayer) { overviewMap.removeLayer(ovmHeatLayer); ovmHeatLayer = null; }
+    if (!document.getElementById('ovmLayerHeat').checked) return;
+    // Heat layer here represents flight-route density (GPX points), same
+    // dataset/semantics as the admin/viewer "Heatmapa" card, not detections.
+    const pts = ovmData.routes.flat();
+    if (!pts.length) return;
+    ovmHeatLayer = L.heatLayer(pts, {
+        radius: 20, blur: 25, maxZoom: overviewMap.getZoom(),
+        gradient: { 0.2: '#4575b4', 0.45: '#74add1', 0.65: '#fdae61', 0.82: '#f46d43', 1.0: '#d73027' }
+    }).addTo(overviewMap);
+}
+
+function ovmRenderPoints() {
+    ovmPointsGroup.clearLayers();
+    ovmData.points.forEach(p => {
+        const color = ovmTypeColors[p.detection_type] || '#6c757d';
+        L.circleMarker([p.lat, p.lon], { radius: 4, color, fillColor: color, fillOpacity: .8, weight: 1 })
+            .bindPopup(`<b>${p.detection_type}</b><br><small>${p.source} · ${p.entity_count} ent. · ${p.detected_at}</small>`)
+            .addTo(ovmPointsGroup);
+    });
+}
+
+function ovmRenderRoutes() {
+    ovmRoutesGroup.clearLayers();
+    ovmData.routes.forEach(pts => {
+        L.polyline(pts, { color: '#f0c040', weight: 1.5, opacity: .35 }).addTo(ovmRoutesGroup);
+    });
+}
+
+function ovmRenderCameras() {
+    ovmCamerasGroup.clearLayers();
+    ovmData.cameras.forEach(c => {
+        L.circleMarker([c.lat, c.lon], { radius: 5, color: '#20c997', fillColor: '#20c997', fillOpacity: .9, weight: 1 })
+            .bindPopup(`<b>${c.name}</b><br><small>${c.location_name ?? ''}<br>${c.station_name ?? ''} · ${c.is_active ? 'aktivna' : 'neaktivna'}</small>`)
+            .addTo(ovmCamerasGroup);
+    });
+}
+
+function ovmRenderStations() {
+    ovmStationsGroup.clearLayers();
+    ovmData.stations.forEach(s => {
+        L.marker([s.lat, s.lon], { icon: L.divIcon({ className: '', html: `<div style="width:10px;height:10px;border-radius:50%;background:#f0c040;border:2px solid #fff"></div>` }) })
+            .bindPopup(`<b>${s.name}</b><br><small>${s.administration_name ?? ''}</small>`)
+            .addTo(ovmStationsGroup);
+        if (s.boundary && s.boundary.length >= 3) {
+            L.polygon(s.boundary, { color: '#f0c040', weight: 1.5, fillOpacity: .04 }).addTo(ovmStationsGroup);
+        }
+    });
+}
+
+function ovmRenderAdmins() {
+    ovmAdminsGroup.clearLayers();
+    ovmData.administrations.forEach(a => {
+        if (a.boundary && a.boundary.length >= 3) {
+            L.polygon(a.boundary, { color: '#9b59d0', weight: 2, fillOpacity: .03, dashArray: '6 4' })
+                .bindPopup(a.name)
+                .addTo(ovmAdminsGroup);
+        }
+    });
+}
+
+function ovmSyncVisibility() {
+    document.getElementById('ovmLayerPoints').checked   ? ovmPointsGroup.addTo(overviewMap)   : overviewMap.removeLayer(ovmPointsGroup);
+    document.getElementById('ovmLayerRoutes').checked   ? ovmRoutesGroup.addTo(overviewMap)   : overviewMap.removeLayer(ovmRoutesGroup);
+    document.getElementById('ovmLayerCameras').checked  ? ovmCamerasGroup.addTo(overviewMap)  : overviewMap.removeLayer(ovmCamerasGroup);
+    document.getElementById('ovmLayerStations').checked ? ovmStationsGroup.addTo(overviewMap) : overviewMap.removeLayer(ovmStationsGroup);
+    document.getElementById('ovmLayerAdmins').checked   ? ovmAdminsGroup.addTo(overviewMap)   : overviewMap.removeLayer(ovmAdminsGroup);
+    ovmRenderHeat();
+}
+
+function ovmRenderAll() {
+    ovmRenderPoints();
+    ovmRenderRoutes();
+    ovmRenderCameras();
+    ovmRenderStations();
+    ovmRenderAdmins();
+    ovmSyncVisibility();
+    document.getElementById('ovmFilteredCount').textContent =
+        `${ovmData.points.length} detekcija · ${ovmData.routes.length} letova · ${ovmData.cameras.length} kamera · ${ovmData.stations.length} postaja`;
+}
+
+function ovmBuildQuery() {
+    const params = new URLSearchParams();
+    const admin = document.getElementById('ovmAdministration').value;
+    if (admin) params.set('administration_id', admin);
+    const station = document.getElementById('ovmStation').value;
+    if (station) params.set('station_id', station);
+    const from = document.getElementById('ovmDateFrom').value;
+    if (from) params.set('date_from', from);
+    const to = document.getElementById('ovmDateTo').value;
+    if (to) params.set('date_to', to);
+    const type = document.getElementById('ovmType').value;
+    if (type) params.set('detection_type', type);
+    const source = document.getElementById('ovmSource').value;
+    if (source) params.set('source', source);
+    return params.toString();
+}
+
+function ovmLoadData() {
+    document.getElementById('ovmFilteredCount').textContent = 'Učitavanje...';
+    fetch('{{ route('dashboard.overviewMap') }}?' + ovmBuildQuery())
+        .then(r => r.json())
+        .then(d => {
+            ovmData = d;
+            const allPts = ovmData.routes.flat().concat(ovmData.points.map(p => [p.lat, p.lon]));
+            if (allPts.length) overviewMap.fitBounds(L.latLngBounds(allPts).pad(0.1));
+            ovmRenderAll();
+        })
+        .catch(() => { document.getElementById('ovmFilteredCount').textContent = 'Greška pri učitavanju'; });
+}
+
+document.getElementById('ovmApply').addEventListener('click', ovmLoadData);
+document.getElementById('ovmReset').addEventListener('click', () => {
+    ['ovmAdministration', 'ovmStation', 'ovmDateFrom', 'ovmDateTo', 'ovmType', 'ovmSource'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    ovmLoadData();
+});
+['ovmLayerHeat', 'ovmLayerPoints', 'ovmLayerRoutes', 'ovmLayerCameras', 'ovmLayerStations', 'ovmLayerAdmins'].forEach(id => {
+    document.getElementById(id).addEventListener('change', ovmSyncVisibility);
+});
+
+// Administration → station cascading filter
+const ovmAdminSelect = document.getElementById('ovmAdministration');
+const ovmStationSelect = document.getElementById('ovmStation');
+ovmAdminSelect.addEventListener('change', () => {
+    const adminId = ovmAdminSelect.value;
+    Array.from(ovmStationSelect.options).forEach(opt => {
+        if (!opt.value) return;
+        opt.hidden = adminId !== '' && opt.dataset.admin != adminId;
+    });
+    if (adminId !== '' && ovmStationSelect.value &&
+        ovmStationSelect.options[ovmStationSelect.selectedIndex]?.dataset.admin != adminId) {
+        ovmStationSelect.value = '';
+    }
+});
+
+ovmLoadData();
 </script>
 @endif
 <script>

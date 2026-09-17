@@ -9,11 +9,11 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, roc_curve, confusion_matrix, silhouette_score,
-)
+from sklearn.metrics import silhouette_score
+from scipy.stats import gaussian_kde
 from dotenv import load_dotenv
+from ml_common import evaluate_model
+import zones as zones_mod
 import os
 
 load_dotenv()
@@ -41,16 +41,12 @@ def get_detections(station_id: int | None = None, administration_id: int | None 
     conn = pymysql.connect(**DB)
     sql = """
         SELECT
-            d.id, d.latitude, d.longitude, d.type, d.count,
-            d.detected_at, d.escalation_level, d.confirmed, d.source,
+            d.id, d.flight_id, d.latitude, d.longitude, d.detection_type, d.entity_count,
+            d.detected_at, d.source, d.station_id,
             HOUR(d.detected_at)       AS hour,
-            DAYOFWEEK(d.detected_at)  AS dow,
-            COALESCE(f.station_id, hc.station_id) AS station_id
+            DAYOFWEEK(d.detected_at)  AS dow
         FROM detections d
-        LEFT JOIN flights f ON f.id = d.flight_id
-        LEFT JOIN hunting_cameras hc ON hc.id = d.camera_id
-        LEFT JOIN border_police_stations bps
-            ON bps.id = COALESCE(f.station_id, hc.station_id)
+        LEFT JOIN border_police_stations bps ON bps.id = d.station_id
         WHERE d.latitude IS NOT NULL AND d.longitude IS NOT NULL
     """
     params = []
@@ -58,22 +54,45 @@ def get_detections(station_id: int | None = None, administration_id: int | None 
         sql += " AND bps.police_administration_id = %s"
         params = [administration_id]
     elif station_id:
-        sql += " AND (f.station_id = %s OR hc.station_id = %s)"
-        params = [station_id, station_id]
+        sql += " AND d.station_id = %s"
+        params = [station_id]
+
+    df = pd.read_sql(sql, conn, params=params or None)
+    conn.close()
+    return df.rename(columns={"detection_type": "type", "entity_count": "count"})
+
+
+def get_flight_points(station_id: int | None = None, administration_id: int | None = None) -> pd.DataFrame:
+    conn = pymysql.connect(**DB)
+    sql = """
+        SELECT g.flight_id, g.latitude, g.longitude
+        FROM gpx_points g
+        JOIN flights f ON f.id = g.flight_id
+        LEFT JOIN border_police_stations bps ON bps.id = f.station_id
+        WHERE g.latitude IS NOT NULL AND g.longitude IS NOT NULL
+    """
+    params = []
+    if administration_id:
+        sql += " AND bps.police_administration_id = %s"
+        params = [administration_id]
+    elif station_id:
+        sql += " AND f.station_id = %s"
+        params = [station_id]
 
     df = pd.read_sql(sql, conn, params=params or None)
     conn.close()
     return df
 
 
-def get_flight_points(station_id: int | None = None, administration_id: int | None = None) -> pd.DataFrame:
+def get_flights_meta(station_id: int | None = None, administration_id: int | None = None) -> pd.DataFrame:
+    """Flight-level metadata (no points) — id/flight_date/duration, used to
+    compute per-zone surveillance minutes without re-joining GPX points."""
     conn = pymysql.connect(**DB)
     sql = """
-        SELECT g.latitude, g.longitude
-        FROM gpx_points g
-        JOIN flights f ON f.id = g.flight_id
+        SELECT f.id, f.flight_date, f.duration_minutes
+        FROM flights f
         LEFT JOIN border_police_stations bps ON bps.id = f.station_id
-        WHERE g.latitude IS NOT NULL AND g.longitude IS NOT NULL
+        WHERE 1 = 1
     """
     params = []
     if administration_id:
@@ -114,52 +133,90 @@ def health():
 @app.get("/clusters")
 def clusters(station_id: int = None, administration_id: int = None, eps_km: float = 2.0, min_samples: int = 3):
     df = get_detections(station_id, administration_id)
-    if len(df) < min_samples:
-        return {"clusters": [], "noise": []}
+    computed = zones_mod.compute_zones(df, eps_km, min_samples)
 
-    coords = df[["latitude", "longitude"]].values.astype(float)
-    # DBSCAN with haversine distance (radians input)
-    coords_rad = np.radians(coords)
-    eps_rad = eps_km / 6371.0  # Earth radius km
+    # Stable K1..KN ids are assigned by count (zones_mod's own ordering), but
+    # this endpoint's array order stays risk-sorted for backward
+    # compatibility with the existing "top zone" list on Analiza snimke.
+    result = sorted(computed["zones"], key=lambda z: z["risk"], reverse=True)
+    return {"clusters": result, "noise": computed["noise"], "total_detections": computed["total_detections"]}
 
-    labels = DBSCAN(eps=eps_rad, min_samples=min_samples, metric="haversine").fit_predict(coords_rad)
-    df["cluster"] = labels
 
-    result = []
-    for cid in sorted(set(labels)):
-        if cid == -1:
-            continue
-        grp = df[df.cluster == cid]
-        total_count = int(grp["count"].sum())
-        avg_esc = float(grp["escalation_level"].mean())
-        dominant_type = grp["type"].mode().iloc[0] if not grp.empty else "other"
+def _zone_pipeline_inputs(station_id: int = None, administration_id: int = None):
+    """Shared setup for every zone-pipeline endpoint below: detections
+    (each row tagged with the exact zone DBSCAN assigned it — same "zone"
+    column /clusters itself is built from, so counts never drift between
+    that endpoint and this pipeline), DBSCAN zones, flight metadata and
+    GPX points."""
+    df = get_detections(station_id, administration_id)
+    computed = zones_mod.compute_zones(df)
+    df = df.reset_index(drop=True)
+    df["zone"] = computed["point_zone_ids"]
+    flights_meta = get_flights_meta(station_id, administration_id)
+    flight_points = get_flight_points(station_id, administration_id)
+    return df, computed["zones"], flights_meta, flight_points
 
-        # Risk score 0–100
-        risk = min(100, int(
-            (len(grp) * 10) +
-            (avg_esc * 15) +
-            (total_count * 0.5)
-        ))
 
-        result.append({
-            "id": int(cid),
-            "lat": float(grp["latitude"].mean()),
-            "lon": float(grp["longitude"].mean()),
-            "count": len(grp),
-            "total_individuals": total_count,
-            "avg_escalation": round(avg_esc, 2),
-            "dominant_type": dominant_type,
-            "risk": risk,
-            "radius_km": float(grp.apply(
-                lambda r: np.sqrt((r.latitude - grp.latitude.mean())**2 + (r.longitude - grp.longitude.mean())**2) * 111,
-                axis=1
-            ).max()) if len(grp) > 1 else 0.5,
-        })
+# ── Zone vs. GPX flight comparison ─────────────────────────────────────────────
+@app.get("/zones/flight-stats")
+def zones_flight_stats(station_id: int = None, administration_id: int = None):
+    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    if not zones:
+        return {"zones": [], "message": "Nedovoljno detekcija za formiranje zona."}
+    stats = zones_mod.zone_flight_stats(zones, df, flights_meta, flight_points)
+    return {"zones": stats}
 
-    result.sort(key=lambda x: x["risk"], reverse=True)
-    noise_pts = df[df.cluster == -1][["latitude", "longitude"]].values.tolist()
 
-    return {"clusters": result, "noise": noise_pts, "total_detections": len(df)}
+# ── Supervised dataset preview (zone × day × time-block) ──────────────────────
+@app.get("/zones/dataset-preview")
+def zones_dataset_preview(station_id: int = None, administration_id: int = None, rows: int = 20):
+    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    if not zones:
+        return {"rows": [], "n_rows": 0, "n_positive": 0, "message": "Nedovoljno detekcija za formiranje zona."}
+    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_points)
+    if dataset.empty:
+        return {"rows": [], "n_rows": 0, "n_positive": 0, "message": "Nedovoljno povijesnih podataka (treba >30 dana)."}
+    preview = dataset.sample(min(rows, len(dataset)), random_state=42).sort_values("date")
+    return {
+        "rows": preview.to_dict(orient="records"),
+        "n_rows": len(dataset),
+        "n_positive": int(dataset["label"].sum()),
+        "n_zones": len(zones),
+        "columns": list(dataset.columns),
+    }
+
+
+# ── 5-model comparison on the zone timeline dataset (chronological split) ─────
+@app.get("/zone-model-metrics")
+def zone_model_metrics(station_id: int = None, administration_id: int = None):
+    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    if not zones:
+        return {"trained": False, "message": "Nedovoljno detekcija za formiranje zona."}
+    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_points)
+    return zones_mod.compare_zone_models_cached(dataset)
+
+
+# ── Predictive probability per zone for a given day/time-block ────────────────
+@app.get("/zone-predictions")
+def zone_predictions(station_id: int = None, administration_id: int = None,
+                      model: str = None, dow: int = None, block: int = None):
+    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    if not zones:
+        return {"zones": [], "message": "Nedovoljno detekcija za formiranje zona."}
+    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_points)
+    if dataset.empty:
+        return {"zones": [], "message": "Nedovoljno povijesnih podataka (treba >30 dana)."}
+
+    # No explicit model requested: use whichever model /zone-model-metrics
+    # confirms as best, so the predictive map always reflects the winner of
+    # the 5-model comparison rather than a hardcoded guess.
+    if model is None:
+        comparison = zones_mod.compare_zone_models_cached(dataset)
+        model = comparison.get("best_model") or "gradient_boosting"
+
+    flight_stats = zones_mod.zone_flight_stats(zones, df, flights_meta, flight_points)
+    predictions = zones_mod.predict_zone_probabilities(dataset, zones, flight_stats, model, dow, block)
+    return {"zones": predictions, "model": model}
 
 
 # ── Risk matrix (hour × weekday) ──────────────────────────────────────────────
@@ -176,7 +233,7 @@ def risk_matrix(station_id: int = None, administration_id: int = None):
     for _, row in df.iterrows():
         h = int(row["hour"])
         d = dow_map.get(int(row["dow"]), 0)
-        weight = 1 + int(row["escalation_level"]) * 0.5
+        weight = 1 + min(int(row["count"]) - 1, 5) * 0.2
         matrix[h][d] += weight
 
     # Normalise to 0–100
@@ -219,16 +276,12 @@ def insights(station_id: int = None, administration_id: int = None):
     else:
         slope, trend = 0.0, "stabilan"
 
-    confirmed_pct = round(df["confirmed"].sum() / len(df) * 100, 1) if len(df) else 0
-
     return {
         "total": len(df),
         "by_type": by_type,
         "by_source": by_source,
-        "confirmed_pct": confirmed_pct,
         "trend_30d": trend,
         "trend_slope": round(slope, 3),
-        "high_risk_count": int((df["escalation_level"] >= 2).sum()),
     }
 
 
@@ -250,18 +303,15 @@ def predict(lat: float, lon: float, hour: int, dow: int, station_id: int = None,
         ((df["longitude"].astype(float) - lon) * 111 * np.cos(np.radians(lat))) ** 2
     )
     nearby = df[df["dist_km"] <= 5.0]
-    spatial_score = min(50, len(nearby) * 5)
+    spatial_score = min(60, len(nearby) * 6)
 
     # Temporal: detections at same hour ±1, same dow ±1
     dow_mysql = (dow + 2) % 7  # remap back to MySQL DAYOFWEEK
     temporal = df[(df["hour"].between(max(0, hour - 1), min(23, hour + 1))) &
                   (df["dow"].isin([(dow_mysql % 7) + 1, ((dow_mysql + 1) % 7) + 1]))]
-    temporal_score = min(30, len(temporal) * 3)
+    temporal_score = min(40, len(temporal) * 4)
 
-    # Escalation bonus from nearby incidents
-    esc_score = min(20, int(nearby["escalation_level"].mean() * 5)) if not nearby.empty else 0
-
-    risk = min(100, spatial_score + temporal_score + esc_score)
+    risk = min(100, spatial_score + temporal_score)
 
     return {
         "risk": risk,
@@ -269,7 +319,6 @@ def predict(lat: float, lon: float, hour: int, dow: int, station_id: int = None,
         "factors": {
             "prostorni": spatial_score,
             "vremenski": temporal_score,
-            "eskalacijski": esc_score,
         },
         "nearby_count": len(nearby),
     }
@@ -357,13 +406,15 @@ BORDER_HR_SRB = [
 
 def _border_segments():
     segs = []
-    for line in (BORDER_HR_BIH, BORDER_HR_SRB):
+    groups = []
+    for gi, line in enumerate((BORDER_HR_BIH, BORDER_HR_SRB)):
         for i in range(len(line) - 1):
             segs.append((line[i], line[i + 1]))
-    return segs
+            groups.append(gi)
+    return segs, np.array(groups)
 
 
-_BORDER_SEGMENTS = _border_segments()
+_BORDER_SEGMENTS, _SEG_GROUP = _border_segments()
 _SEG_A = np.array([s[0] for s in _BORDER_SEGMENTS])  # (N,2) lat,lon
 _SEG_B = np.array([s[1] for s in _BORDER_SEGMENTS])
 _SEG_COS_MID = np.cos(np.radians((_SEG_A[:, 0] + _SEG_B[:, 0]) / 2))  # (N,)
@@ -423,6 +474,81 @@ def border_crossing_bearing(lat: float, lon: float, station_points: np.ndarray) 
     return round(float(np.degrees(np.arctan2(east, north))) % 360, 1)
 
 
+_CROATIA_NORMALS: np.ndarray | None = None
+
+
+def _croatia_side_normals() -> np.ndarray:
+    """Unit normal per border segment pointing toward the Croatian side.
+
+    Determined once per named border polyline (HR-BiH, HR-SRB) by a
+    *majority vote* of every border-police station against that polyline,
+    not per segment and not from a single reference point. Two more naive
+    approaches were tried and both broke down on this real, meandering
+    river border:
+      - nearest-station-per-segment (what border_crossing_bearing() uses
+        for its one-off arrow lookups) flips sign wherever the closest
+        station happens to sit more *along* the border than *across* it;
+      - a single interior reference (e.g. the centroid of all stations)
+        assumes "left of the nearest segment" is a single consistent side
+        for the *whole* curve, which only holds for a convex-ish curve —
+        this border is not convex enough over its full length for that to
+        hold everywhere.
+    Since real stations sit close to their own local stretch of border,
+    each station's own nearest-segment classification is locally reliable;
+    letting ~30 of them vote drowns out the few whose local segment is
+    ambiguous (sparse-coverage stretches, sharp meanders)."""
+    global _CROATIA_NORMALS
+    if _CROATIA_NORMALS is not None:
+        return _CROATIA_NORMALS
+
+    station_points = get_station_points()
+    n1_all = np.stack([-_SEG_DY, _SEG_DX], axis=1)
+    sign = np.ones(len(_SEG_A))
+
+    for g in np.unique(_SEG_GROUP):
+        mask = _SEG_GROUP == g
+        votes = 0
+        for s_lat, s_lon in station_points:
+            px = (s_lon - _SEG_A[mask, 1]) * 111.0 * _SEG_COS_MID[mask]
+            py = (s_lat - _SEG_A[mask, 0]) * 111.0
+            t = np.clip((px * _SEG_DX[mask] + py * _SEG_DY[mask]) / _SEG_LEN2[mask], 0, 1)
+            perp_x = px - t * _SEG_DX[mask]
+            perp_y = py - t * _SEG_DY[mask]
+            dist = np.hypot(perp_x, perp_y)
+            j = int(np.argmin(dist))
+            if dist[j] > 60:  # station isn't really near this particular border line
+                continue
+            n1_j = n1_all[mask][j]
+            dot = perp_x[j] * n1_j[0] + perp_y[j] * n1_j[1]
+            votes += 1 if dot >= 0 else -1
+        sign[mask] = 1.0 if votes >= 0 else -1.0
+
+    normals = n1_all * sign[:, None]
+    norm = np.hypot(normals[:, 0], normals[:, 1])
+    norm[norm < 1e-9] = 1.0
+    _CROATIA_NORMALS = normals / norm[:, None]
+    return _CROATIA_NORMALS
+
+
+def croatia_side_mask(lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
+    """True for points on the Croatian side of the HR-BiH/HR-SRB border
+    polyline. dist_to_border_km() alone is symmetric (same value on both
+    sides), so the risk grid needs this too or it paints an equally wide
+    band inside Bosnia/Serbia — border police only ever patrol (and only
+    ever record detections) on the Croatian side."""
+    px = (lons[:, None] - _SEG_A[None, :, 1]) * 111.0 * _SEG_COS_MID[None, :]
+    py = (lats[:, None] - _SEG_A[None, :, 0]) * 111.0
+    t = np.clip((px * _SEG_DX[None, :] + py * _SEG_DY[None, :]) / _SEG_LEN2[None, :], 0, 1)
+    perp_x = px - t * _SEG_DX[None, :]
+    perp_y = py - t * _SEG_DY[None, :]
+    nearest = np.argmin(np.hypot(perp_x, perp_y), axis=1)
+
+    normals = _croatia_side_normals()
+    rows = np.arange(len(lats))
+    dot = perp_x[rows, nearest] * normals[nearest, 0] + perp_y[rows, nearest] * normals[nearest, 1]
+    return dot >= 0
+
+
 # ── Predictive risk grid (presence-only model, MaxEnt-style) ─────────────────
 def _encode_time(df: pd.DataFrame) -> pd.DataFrame:
     hour_rad = df["hour"].astype(float) / 24 * 2 * np.pi
@@ -455,7 +581,7 @@ def _train_presence_model(df: pd.DataFrame, bbox: tuple) -> RandomForestClassifi
         "lon": pos_src["longitude"].astype(float),
         "hour": pos_src["hour"].astype(float),
         "dow": pos_src["dow"].astype(float),
-        "weight": 1 + pos_src["escalation_level"].astype(float) * 0.5,
+        "weight": 1 + np.minimum(pos_src["count"].astype(float) - 1, 5) * 0.2,
         "label": 1,
     })
     bg = pd.DataFrame({
@@ -475,23 +601,29 @@ def _train_presence_model(df: pd.DataFrame, bbox: tuple) -> RandomForestClassifi
     return model
 
 
-@app.get("/risk-grid")
-def risk_grid(station_id: int = None, administration_id: int = None,
-              hour: int = None, dow: int = None, cell_km: float = None,
-              corridor_km: float = 20.0):
-    """
-    Trains a spatio-temporal presence-only risk model on historical detections and
-    scores a grid over the covered area, comparing predicted risk against how much
-    drone-flight coverage each cell has already had — surfacing under-watched
-    high-risk cells and over-watched low-risk cells. The grid is clipped to a
-    corridor around the actual HR–BiH / HR–SRB border so results stay anchored
-    to the border line instead of drifting into the interior.
-    """
-    df = get_detections(station_id, administration_id)
-    if len(df) < 8:
-        return {"cells": [], "recommend_increase": [], "recommend_decrease": [],
-                "message": "Nedovoljno detekcija za treniranje modela (potrebno min. 8)"}
+def _bin_counts_to_grid(lat_arr, lon_arr, bbox, lat_step, lon_step, shape) -> np.ndarray:
+    """Count how many (lat, lon) points fall into each cell of a lat/lon grid
+    of the given shape — the raw-count building block behind both the
+    risk-grid's flight-coverage heuristic and the bandit's pull/success
+    counts."""
+    counts = np.zeros(shape)
+    if lat_arr.size == 0:
+        return counts
+    lat_idx = np.clip(((lat_arr - bbox[0]) / lat_step).astype(int), 0, shape[0] - 1)
+    lon_idx = np.clip(((lon_arr - bbox[2]) / lon_step).astype(int), 0, shape[1] - 1)
+    np.add.at(counts, (lat_idx, lon_idx), 1)
+    return counts
 
+
+def _build_grid(df: pd.DataFrame, cell_km: float = None, corridor_km: float = 20.0, divisor: float = 22.0):
+    """
+    Shared grid geometry for anything that scores a spatial grid over the
+    covered area: bbox padded around the historical detections, cell size,
+    and clipping to a corridor on the Croatian side of the actual border so
+    cells never drift into the interior or bleed across into Bosnia/Serbia.
+    Returns None if the resulting grid would be empty or too large — callers
+    should surface that as their own "not enough data" message.
+    """
     lat_min, lat_max = float(df["latitude"].min()), float(df["latitude"].max())
     lon_min, lon_max = float(df["longitude"].min()), float(df["longitude"].max())
     pad_lat = max((lat_max - lat_min) * 0.2, 0.03)
@@ -504,17 +636,14 @@ def risk_grid(station_id: int = None, administration_id: int = None,
             (bbox[1] - bbox[0]) * 111.0,
             (bbox[3] - bbox[2]) * 111.0 * max(np.cos(np.radians(mid_lat)), 0.2),
         )
-        cell_km = max(1.0, extent_km / 22)
+        cell_km = max(1.0, extent_km / divisor)
 
     lat_step = cell_km / 111.0
     lon_step = cell_km / (111.0 * max(np.cos(np.radians(mid_lat)), 0.2))
     lats = np.arange(bbox[0], bbox[1], lat_step)
     lons = np.arange(bbox[2], bbox[3], lon_step)
     if len(lats) == 0 or len(lons) == 0 or len(lats) * len(lons) > 2500:
-        return {"cells": [], "recommend_increase": [], "recommend_decrease": [],
-                "message": "Područje je preveliko za odabranu veličinu ćelije"}
-
-    model = _train_presence_model(df, bbox)
+        return None
 
     grid_lat, grid_lon = np.meshgrid(lats, lons, indexing="ij")
     flat_lat, flat_lon = grid_lat.ravel(), grid_lon.ravel()
@@ -522,16 +651,54 @@ def risk_grid(station_id: int = None, administration_id: int = None,
     # Clip to the border corridor so cells drifting into the interior (an
     # artifact of the rectangular padded bbox) are dropped.
     border_dist = dist_to_border_km(flat_lat, flat_lon)
-    keep_mask = border_dist <= corridor_km
+    keep_mask = (border_dist <= corridor_km) & croatia_side_mask(flat_lat, flat_lon)
     if not keep_mask.any():
-        return {"cells": [], "recommend_increase": [], "recommend_decrease": [],
-                "message": "Nema ćelija unutar zadanog pojasa uz granicu"}
+        return None
 
     lat_idx_full, lon_idx_full = np.meshgrid(np.arange(len(lats)), np.arange(len(lons)), indexing="ij")
-    keep_lat_idx = lat_idx_full.ravel()[keep_mask]
-    keep_lon_idx = lon_idx_full.ravel()[keep_mask]
-    flat_lat, flat_lon = flat_lat[keep_mask], flat_lon[keep_mask]
-    n_cells = len(flat_lat)
+
+    return {
+        "bbox": bbox, "cell_km": cell_km,
+        "lat_step": lat_step, "lon_step": lon_step,
+        "lats": lats, "lons": lons,
+        "flat_lat": flat_lat[keep_mask], "flat_lon": flat_lon[keep_mask],
+        "keep_lat_idx": lat_idx_full.ravel()[keep_mask],
+        "keep_lon_idx": lon_idx_full.ravel()[keep_mask],
+        "n_cells": int(keep_mask.sum()),
+    }
+
+
+@app.get("/risk-grid")
+def risk_grid(station_id: int = None, administration_id: int = None,
+              hour: int = None, dow: int = None, cell_km: float = None,
+              corridor_km: float = 20.0):
+    """
+    Trains a spatio-temporal presence-only risk model on historical detections and
+    scores a grid over the covered area, comparing predicted risk against how much
+    drone-flight coverage each cell has already had — surfacing under-watched
+    high-risk cells and over-watched low-risk cells. The grid is clipped to a
+    corridor on the Croatian side of the actual HR–BiH / HR–SRB border, so
+    results stay anchored to the border line instead of drifting into the
+    interior, and never bleed across into Bosnia/Serbia.
+    """
+    df = get_detections(station_id, administration_id)
+    if len(df) < 8:
+        return {"cells": [], "recommend_increase": [], "recommend_decrease": [],
+                "message": "Nedovoljno detekcija za treniranje modela (potrebno min. 8)"}
+
+    grid = _build_grid(df, cell_km, corridor_km)
+    if grid is None:
+        return {"cells": [], "recommend_increase": [], "recommend_decrease": [],
+                "message": "Područje je preveliko za odabranu veličinu ćelije ili nema ćelija unutar pojasa uz granicu"}
+
+    bbox, cell_km = grid["bbox"], grid["cell_km"]
+    lat_step, lon_step = grid["lat_step"], grid["lon_step"]
+    lats, lons = grid["lats"], grid["lons"]
+    flat_lat, flat_lon = grid["flat_lat"], grid["flat_lon"]
+    keep_lat_idx, keep_lon_idx = grid["keep_lat_idx"], grid["keep_lon_idx"]
+    n_cells = grid["n_cells"]
+
+    model = _train_presence_model(df, bbox)
 
     if hour is not None and dow is not None:
         dow_mysql = float(((dow + 2) % 7) + 1)
@@ -548,14 +715,13 @@ def risk_grid(station_id: int = None, administration_id: int = None,
 
     # Coverage: how much drone-flight history each cell already has
     flights_df = get_flight_points(station_id, administration_id)
-    coverage_grid = np.zeros((len(lats), len(lons)))
-    if not flights_df.empty:
-        f_lat_idx = np.clip(((flights_df["latitude"].astype(float) - bbox[0]) / lat_step).astype(int), 0, len(lats) - 1)
-        f_lon_idx = np.clip(((flights_df["longitude"].astype(float) - bbox[2]) / lon_step).astype(int), 0, len(lons) - 1)
-        np.add.at(coverage_grid, (f_lat_idx, f_lon_idx), 1)
-        cov_log = np.log1p(coverage_grid)
-        if cov_log.max() > 0:
-            coverage_grid = cov_log / cov_log.max() * 100
+    coverage_grid = _bin_counts_to_grid(
+        flights_df["latitude"].astype(float).to_numpy(), flights_df["longitude"].astype(float).to_numpy(),
+        bbox, lat_step, lon_step, (len(lats), len(lons)),
+    )
+    cov_log = np.log1p(coverage_grid)
+    if cov_log.max() > 0:
+        coverage_grid = cov_log / cov_log.max() * 100
     coverage = coverage_grid[keep_lat_idx, keep_lon_idx]
 
     cells = [
@@ -591,53 +757,146 @@ def risk_grid(station_id: int = None, administration_id: int = None,
     }
 
 
+# ── Patrol allocation via UCB1 (reinforcement learning) ───────────────────────
+@app.get("/patrol-bandit")
+def patrol_bandit(station_id: int = None, administration_id: int = None,
+                   cell_km: float = None, corridor_km: float = 20.0):
+    """
+    Frames "where to patrol next" as a multi-armed bandit: each grid cell is
+    an arm, a "pull" is a GPX point recorded in that cell (a patrol visit),
+    and a "success" is a detection recorded there. Unlike the risk-grid
+    (a trained classifier) or RecommendationService (plain rate vs. average),
+    this is genuine reinforcement learning — UCB1 explicitly scores the
+    exploration/exploitation trade-off, so a cell that has never been
+    patrolled isn't silently ignored just because it has no history; it's
+    flagged as the highest-value unknown instead.
+    """
+    df = get_detections(station_id, administration_id)
+    if len(df) < 8:
+        return {"cells": [], "recommend_explore": [],
+                "message": "Nedovoljno detekcija za izgradnju mreže (potrebno min. 8)"}
+
+    grid = _build_grid(df, cell_km, corridor_km)
+    if grid is None:
+        return {"cells": [], "recommend_explore": [],
+                "message": "Područje je preveliko za odabranu veličinu ćelije ili nema ćelija unutar pojasa uz granicu"}
+
+    bbox, cell_km = grid["bbox"], grid["cell_km"]
+    lat_step, lon_step = grid["lat_step"], grid["lon_step"]
+    lats, lons = grid["lats"], grid["lons"]
+    flat_lat, flat_lon = grid["flat_lat"], grid["flat_lon"]
+    keep_lat_idx, keep_lon_idx = grid["keep_lat_idx"], grid["keep_lon_idx"]
+    n_cells = grid["n_cells"]
+    shape = (len(lats), len(lons))
+
+    flights_df = get_flight_points(station_id, administration_id)
+    pulls_grid = _bin_counts_to_grid(
+        flights_df["latitude"].astype(float).to_numpy(), flights_df["longitude"].astype(float).to_numpy(),
+        bbox, lat_step, lon_step, shape,
+    )
+    successes_grid = _bin_counts_to_grid(
+        df["latitude"].astype(float).to_numpy(), df["longitude"].astype(float).to_numpy(),
+        bbox, lat_step, lon_step, shape,
+    )
+
+    pulls = pulls_grid[keep_lat_idx, keep_lon_idx]
+    successes = successes_grid[keep_lat_idx, keep_lon_idx]
+    total_pulls = float(pulls.sum())
+
+    cells = []
+    for i in range(n_cells):
+        n = float(pulls[i])
+        explored = n > 0
+        mean_reward = (successes[i] / n) if explored else None
+        # UCB1: mean_reward + sqrt(2 ln N / n) — unexplored cells (n=0) have
+        # no defined score, so they're ranked ahead of every scored cell
+        # instead of being assigned an arbitrary number.
+        ucb_score = (mean_reward + np.sqrt(2 * np.log(max(total_pulls, 1)) / n)) if explored else None
+
+        cells.append({
+            "lat": round(float(flat_lat[i]), 5),
+            "lon": round(float(flat_lon[i]), 5),
+            "n_pulls": int(n),
+            "successes": int(successes[i]),
+            "mean_reward": round(mean_reward, 3) if explored else None,
+            "ucb_score": round(float(ucb_score), 3) if explored else None,
+            "explored": explored,
+        })
+
+    # Unexplored cells first (highest exploration value), then by UCB score.
+    recommend_explore = sorted(
+        cells, key=lambda c: (c["explored"], -(c["ucb_score"] or 0))
+    )[:8]
+
+    return {
+        "cell_km": round(float(cell_km), 2),
+        "cells": cells,
+        "recommend_explore": recommend_explore,
+        "total_pulls": int(total_pulls),
+        "border": {
+            "hr_bih": [list(p) for p in BORDER_HR_BIH],
+            "hr_srb": [list(p) for p in BORDER_HR_SRB],
+        },
+    }
+
+
+# ── Kernel Density Estimation heatmap ──────────────────────────────────────────
+@app.get("/kde-heatmap")
+def kde_heatmap(station_id: int = None, administration_id: int = None,
+                 cell_km: float = None, corridor_km: float = 20.0):
+    """
+    Kernel Density Estimation over every detection regardless of source
+    (drone, trail camera, ground observation) — a genuine statistical
+    density-smoothing technique. Distinct from DBSCAN (density-based
+    *clustering* into discrete groups) and from the Leaflet.heat plugin used
+    elsewhere in the app (a simple per-point radius accumulation with no
+    real bandwidth/kernel math). Uses scipy's Gaussian KDE with Scott's rule
+    bandwidth (no manual tuning), evaluated on the same border-clipped grid
+    as risk-grid/patrol-bandit so all three "circle" views line up.
+    """
+    df = get_detections(station_id, administration_id)
+    if len(df) < 5:
+        return {"points": [], "message": "Nedovoljno detekcija za KDE (potrebno min. 5)"}
+
+    # Finer grid than risk-grid/patrol-bandit (which are tuned for readable
+    # discrete squares) — KDE reads as a proper smooth heatmap only with
+    # enough evaluation points.
+    grid = _build_grid(df, cell_km, corridor_km, divisor=50.0)
+    if grid is None:
+        return {"points": [], "message": "Područje je preveliko za odabranu veličinu ćelije ili nema ćelija unutar pojasa uz granicu"}
+
+    flat_lat, flat_lon = grid["flat_lat"], grid["flat_lon"]
+
+    coords = np.vstack([df["latitude"].astype(float).to_numpy(), df["longitude"].astype(float).to_numpy()])
+    weights = df["count"].astype(float).to_numpy()  # entity_count as the KDE sample weight
+
+    try:
+        kde = gaussian_kde(coords, weights=weights)
+        density = kde(np.vstack([flat_lat, flat_lon]))
+        bandwidth = round(float(kde.factor), 4)
+    except np.linalg.LinAlgError:
+        return {"points": [], "message": "Detekcije su prostorno preusko raspoređene za KDE (singularna kovarijanca)"}
+
+    density = density / max(float(density.max()), 1e-12) * 100  # normalise 0-100
+
+    points = [
+        [round(float(flat_lat[i]), 5), round(float(flat_lon[i]), 5), round(float(density[i]), 1)]
+        for i in range(len(flat_lat))
+    ]
+
+    return {
+        "points": points,
+        "bandwidth": bandwidth,
+        "trained_on": int(len(df)),
+        "border": {
+            "hr_bih": [list(p) for p in BORDER_HR_BIH],
+            "hr_srb": [list(p) for p in BORDER_HR_SRB],
+        },
+    }
+
+
 # ── Model diagnostics (dev mode) ──────────────────────────────────────────────
 FEATURE_NAMES = ["lat", "lon", "hour_sin", "hour_cos", "dow_sin", "dow_cos"]
-
-
-def _evaluate_model(model, X_train, y_train, w_train, X_test, y_test) -> dict:
-    """Fit one classifier and score it on held-out data. Not every estimator
-    (e.g. KNeighborsClassifier) accepts sample_weight, so that's tried first
-    and silently dropped if unsupported."""
-    try:
-        model.fit(X_train, y_train, sample_weight=w_train)
-    except TypeError:
-        model.fit(X_train, y_train)
-
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]
-
-    metrics = {
-        "accuracy": round(float(accuracy_score(y_test, y_pred)), 3),
-        "precision": round(float(precision_score(y_test, y_pred, zero_division=0)), 3),
-        "recall": round(float(recall_score(y_test, y_pred, zero_division=0)), 3),
-        "f1": round(float(f1_score(y_test, y_pred, zero_division=0)), 3),
-        "roc_auc": round(float(roc_auc_score(y_test, y_proba)), 3) if len(set(y_test)) > 1 else None,
-    }
-
-    cm = confusion_matrix(y_test, y_pred, labels=[0, 1]).tolist()
-    metrics["confusion_matrix"] = {
-        "tn": int(cm[0][0]), "fp": int(cm[0][1]),
-        "fn": int(cm[1][0]), "tp": int(cm[1][1]),
-    }
-
-    if len(set(y_test)) > 1:
-        fpr, tpr, _ = roc_curve(y_test, y_proba)
-        if len(fpr) > 40:
-            idx = np.linspace(0, len(fpr) - 1, 40).astype(int)
-            fpr, tpr = fpr[idx], tpr[idx]
-        metrics["roc_curve"] = {
-            "fpr": [round(float(v), 4) for v in fpr],
-            "tpr": [round(float(v), 4) for v in tpr],
-        }
-
-    if hasattr(model, "feature_importances_"):
-        metrics["feature_importances"] = {
-            name: round(float(imp), 3)
-            for name, imp in zip(FEATURE_NAMES, model.feature_importances_)
-        }
-
-    return metrics
 
 
 @app.get("/model-metrics")
@@ -672,7 +931,7 @@ def model_metrics(station_id: int = None, administration_id: int = None,
         "lon": pos_src["longitude"].astype(float),
         "hour": pos_src["hour"].astype(float),
         "dow": pos_src["dow"].astype(float),
-        "weight": 1 + pos_src["escalation_level"].astype(float) * 0.5,
+        "weight": 1 + np.minimum(pos_src["count"].astype(float) - 1, 5) * 0.2,
         "label": 1,
     })
     bg = pd.DataFrame({
@@ -717,7 +976,7 @@ def model_metrics(station_id: int = None, administration_id: int = None,
             xte = X_test_scaled if needs_scaling else X_test
             models_result[key] = {
                 "label": label,
-                **_evaluate_model(make_model(), xtr, y_train, w_train, xte, y_test),
+                **evaluate_model(make_model(), xtr, y_train, w_train, xte, y_test, feature_names=FEATURE_NAMES),
             }
 
         risk_model = {

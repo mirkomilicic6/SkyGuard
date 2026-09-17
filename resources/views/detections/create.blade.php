@@ -54,25 +54,6 @@
     text-align:center;
 }
 
-/* ── Escalation radio pills ──────────────────────────────────────── */
-.esc-group { display:flex; gap:6px; flex-wrap:wrap; }
-.esc-btn input { display:none; }
-.esc-btn label {
-    display:inline-block;
-    padding:4px 14px;
-    border-radius:20px;
-    border:1px solid rgba(255,255,255,0.15);
-    color:rgba(255,255,255,0.5);
-    font-size:.8rem;
-    cursor:pointer;
-    transition:.15s;
-}
-.esc-btn input:checked + label { color:#fff; font-weight:600; }
-.esc-0 input:checked + label { background:#495057; border-color:#6c757d; }
-.esc-1 input:checked + label { background:rgba(240,192,64,.25); border-color:#f0c040; color:#f0c040; }
-.esc-2 input:checked + label { background:rgba(253,126,20,.25); border-color:#fd7e14; color:#fd7e14; }
-.esc-3 input:checked + label { background:rgba(220,53,69,.25); border-color:#dc3545; color:#dc3545; }
-
 /* ── Section divider ─────────────────────────────────────────────── */
 .form-section-label {
     font-size:.7rem;
@@ -84,10 +65,6 @@
     padding-bottom:4px;
     border-bottom:1px solid rgba(255,255,255,0.07);
 }
-
-/* ── Confirmed toggle ────────────────────────────────────────────── */
-.confirm-toggle { display:flex; align-items:center; gap:10px; }
-.confirm-toggle .custom-control-label { cursor:pointer; font-size:.9rem; }
 </style>
 @endsection
 
@@ -119,11 +96,11 @@
         <i class="fas fa-helicopter"></i>
         <span>Dron let</span>
     </div>
-    <div class="source-card" data-source="camera">
+    <div class="source-card" data-source="trail_camera">
         <i class="fas fa-camera"></i>
         <span>Lovačka kamera</span>
     </div>
-    <div class="source-card" data-source="manual">
+    <div class="source-card" data-source="ground_observation">
         <i class="fas fa-walking"></i>
         <span>Ručno / Zemlja</span>
     </div>
@@ -137,45 +114,41 @@
         <select name="flight_id" id="flight-select" class="form-control">
             <option value="">— Bez veze na let —</option>
             @foreach($flights as $fl)
-            <option value="{{ $fl->id }}">
+            <option value="{{ $fl->id }}" data-station="{{ $fl->station_id }}">
                 {{ $fl->flight_date?->format('d.m.Y H:i') ?? '—' }}
                 @if($fl->location) – {{ Str::limit($fl->location, 35) }}@endif
                 @if($fl->drone) ({{ $fl->drone->name }})@endif
             </option>
             @endforeach
         </select>
-        <small class="text-muted">Odaberite let ako je detekcija uočena za vrijeme patroliranja dronom.</small>
+        <small class="text-muted">Odaberite let ako je detekcija uočena za vrijeme patroliranja dronom — postaja se preuzima automatski.</small>
     </div>
 </div>
 
-{{-- Camera section --}}
-<div class="source-section" id="sec-camera">
-    <div class="form-group">
-        <label>Lovačka kamera *</label>
-        <select name="camera_id" id="camera-select" class="form-control">
-            <option value="">— Odaberi kameru —</option>
-            @foreach($cameras as $cam)
-            <option value="{{ $cam->id }}"
-                data-lat="{{ $cam->latitude }}"
-                data-lon="{{ $cam->longitude }}"
-                data-name="{{ $cam->name }}">
-                {{ $cam->name }}
-                @if($cam->location_name) – {{ $cam->location_name }}@endif
-                @if($cam->station) ({{ $cam->station->name }})@endif
-            </option>
-            @endforeach
-        </select>
-        <small class="text-muted">Koordinate kamere bit će automatski upisane.</small>
-    </div>
-</div>
-
-{{-- Manual section (no extra fields needed) --}}
-<div class="source-section" id="sec-manual">
+{{-- Camera / manual sections (no flight linkage) --}}
+<div class="source-section" id="sec-trail_camera">
     <p class="text-muted" style="font-size:.85rem">
         <i class="fas fa-info-circle mr-1"></i>
-        Ručna prijava — unesite koordinate mjesta detekcije u polja ispod
-        ili kliknite na kartu desno.
+        Detekcija s lovačke kamere — unesite koordinate mjesta detekcije u polja ispod ili kliknite na kartu desno.
     </p>
+</div>
+<div class="source-section" id="sec-ground_observation">
+    <p class="text-muted" style="font-size:.85rem">
+        <i class="fas fa-info-circle mr-1"></i>
+        Ručna prijava s terena — unesite koordinate mjesta detekcije u polja ispod ili kliknite na kartu desno.
+    </p>
+</div>
+
+{{-- Station (required unless a flight was picked) --}}
+<div class="form-group" id="station-group">
+    <label>Policijska postaja *</label>
+    <select name="station_id" id="station-select" class="form-control @error('station_id') is-invalid @enderror">
+        <option value="">— Odaberi postaju —</option>
+        @foreach($stations as $st)
+        <option value="{{ $st->id }}" {{ old('station_id') == $st->id ? 'selected' : '' }}>{{ $st->name }}</option>
+        @endforeach
+    </select>
+    @error('station_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
 </div>
 
 {{-- Coordinates --}}
@@ -209,20 +182,20 @@
     <div class="col-sm-4">
         <div class="form-group">
             <label>Vrsta *</label>
-            <select name="type" class="form-control @error('type') is-invalid @enderror">
-                @foreach(['person'=>'Osoba','group'=>'Skupina','vehicle'=>'Vozilo','smuggling'=>'Krijumčarenje','other'=>'Ostalo'] as $val=>$lbl)
-                <option value="{{ $val }}" {{ old('type') === $val ? 'selected' : '' }}>{{ $lbl }}</option>
+            <select name="detection_type" class="form-control @error('detection_type') is-invalid @enderror">
+                @foreach(['person'=>'Osoba','group'=>'Skupina','vehicle'=>'Vozilo','other'=>'Ostalo'] as $val=>$lbl)
+                <option value="{{ $val }}" {{ old('detection_type') === $val ? 'selected' : '' }}>{{ $lbl }}</option>
                 @endforeach
             </select>
-            @error('type')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            @error('detection_type')<div class="invalid-feedback">{{ $message }}</div>@enderror
         </div>
     </div>
     <div class="col-sm-3">
         <div class="form-group">
             <label>Broj entiteta *</label>
-            <input type="number" name="count" class="form-control @error('count') is-invalid @enderror"
-                   min="1" max="999" value="{{ old('count', 1) }}">
-            @error('count')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <input type="number" name="entity_count" class="form-control @error('entity_count') is-invalid @enderror"
+                   min="1" max="999" value="{{ old('entity_count', 1) }}">
+            @error('entity_count')<div class="invalid-feedback">{{ $message }}</div>@enderror
         </div>
     </div>
     <div class="col-sm-5">
@@ -238,8 +211,8 @@
 
 <div class="form-group">
     <label>Napomena</label>
-    <textarea name="notes" class="form-control" rows="3"
-              placeholder="Opis situacije, ponašanje osoba, smjer kretanja...">{{ old('notes') }}</textarea>
+    <textarea name="note" class="form-control" rows="3"
+              placeholder="Opis situacije, ponašanje osoba, smjer kretanja...">{{ old('note') }}</textarea>
 </div>
 
 </div>{{-- card-body --}}
@@ -264,92 +237,6 @@
     </div>
 </div>
 
-{{-- AI analysis card --}}
-<div class="card">
-    <div class="card-header py-2">
-        <h6 class="mb-0">
-            <i class="fas fa-brain mr-2 text-info"></i>
-            Analitički podaci
-            <small class="text-muted ml-1">({{ __('ui.optional') }})</small>
-        </h6>
-    </div>
-    <div class="card-body">
-
-        {{-- Confirmed + Escalation --}}
-        <div class="row align-items-center mb-3">
-            <div class="col-6">
-                <div class="custom-control custom-switch confirm-toggle">
-                    <input type="hidden" name="confirmed" value="0">
-                    <input type="checkbox" class="custom-control-input" id="confirmed-chk"
-                           name="confirmed" value="1" {{ old('confirmed') ? 'checked' : '' }}>
-                    <label class="custom-control-label" for="confirmed-chk">
-                        Potvrđeno
-                    </label>
-                </div>
-            </div>
-            <div class="col-6">
-                <label class="mb-1" style="font-size:.8rem;color:rgba(255,255,255,.5)">Stupanj eskalacije</label>
-                <div class="esc-group">
-                    @foreach([0=>'Info',1=>'Upoz.',2=>'Interv.',3=>'Kritično'] as $lvl=>$lbl)
-                    <div class="esc-btn esc-{{ $lvl }}">
-                        <input type="radio" name="escalation_level" id="esc{{ $lvl }}"
-                               value="{{ $lvl }}" {{ old('escalation_level', 0) == $lvl ? 'checked' : '' }}>
-                        <label for="esc{{ $lvl }}">{{ $lbl }}</label>
-                    </div>
-                    @endforeach
-                </div>
-            </div>
-        </div>
-
-        {{-- Action taken --}}
-        <div class="form-group">
-            <label style="font-size:.85rem">Poduzeta mjera</label>
-            <select name="action_taken" class="form-control form-control-sm">
-                <option value="">— Nije odabrano —</option>
-                @foreach([
-                    'pending'      => 'U obradi',
-                    'apprehended'  => 'Uhićen/a',
-                    'turned_back'  => 'Vraćen/a',
-                    'escaped'      => 'Pobjegao/la',
-                    'false_alarm'  => 'Lažni alarm',
-                    'investigating'=> 'U istrazi',
-                ] as $val => $lbl)
-                <option value="{{ $val }}" {{ old('action_taken') === $val ? 'selected' : '' }}>{{ $lbl }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        {{-- Heading + Weather --}}
-        <div class="row">
-            <div class="col-6">
-                <div class="form-group">
-                    <label style="font-size:.85rem">Smjer kretanja (°)</label>
-                    <div class="input-group input-group-sm">
-                        <input type="number" name="heading_deg" class="form-control"
-                               min="0" max="359" placeholder="0–359"
-                               value="{{ old('heading_deg') }}">
-                        <div class="input-group-append">
-                            <span class="input-group-text">°</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="form-group">
-                    <label style="font-size:.85rem">Vremenske prilike</label>
-                    <select name="weather_condition" class="form-control form-control-sm">
-                        <option value="">— —</option>
-                        @foreach(['clear'=>'Vedro','cloudy'=>'Oblačno','rain'=>'Kiša','fog'=>'Magla','snow'=>'Snijeg','storm'=>'Oluja'] as $val=>$lbl)
-                        <option value="{{ $val }}" {{ old('weather_condition') === $val ? 'selected' : '' }}>{{ $lbl }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-        </div>
-
-    </div>{{-- card-body --}}
-</div>{{-- card --}}
-
 {{-- Submit --}}
 <button type="submit" class="btn btn-warning btn-block mt-2">
     <i class="fas fa-save mr-2"></i> Spremi detekciju
@@ -364,17 +251,7 @@
 
 @section('js')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-@php
-    $cameraJson = $cameras->keyBy('id')->map(fn($c) => [
-        'lat'  => (float) $c->latitude,
-        'lon'  => (float) $c->longitude,
-        'name' => $c->name,
-    ]);
-@endphp
 <script>
-// ── Camera data for auto-fill ──────────────────────────────────────────────
-const cameraData = {!! json_encode($cameraJson) !!};
-
 // ── Leaflet map ────────────────────────────────────────────────────────────
 const DEFAULT_CENTER = [45.15, 17.5]; // Slavonski Brod area
 const DEFAULT_ZOOM   = 9;
@@ -442,63 +319,46 @@ const oldLon = parseFloat(document.getElementById('lon-input').value);
 if (!isNaN(oldLat) && !isNaN(oldLon)) setMarker(oldLat, oldLon);
 
 // ── Source switcher ────────────────────────────────────────────────────────
-const sourceCards    = document.querySelectorAll('.source-card');
-const sourceInput    = document.getElementById('source-input');
-const cameraSelect   = document.getElementById('camera-select');
-const latInput       = document.getElementById('lat-input');
-const lonInput       = document.getElementById('lon-input');
+const sourceCards   = document.querySelectorAll('.source-card');
+const sourceInput   = document.getElementById('source-input');
+const flightSelect  = document.getElementById('flight-select');
+const stationGroup  = document.getElementById('station-group');
+const stationSelect = document.getElementById('station-select');
 
 function activateSource(src) {
     sourceCards.forEach(c => c.classList.toggle('active', c.dataset.source === src));
     document.querySelectorAll('.source-section').forEach(s => s.classList.remove('visible'));
     document.getElementById('sec-' + src).classList.add('visible');
     sourceInput.value = src;
-
-    // Re-enable coords for drone/manual, keep filled for camera
-    if (src !== 'camera') {
-        latInput.readOnly = false;
-        lonInput.readOnly = false;
-    }
+    syncStationRequirement();
 }
 
 sourceCards.forEach(card => {
     card.addEventListener('click', () => activateSource(card.dataset.source));
 });
 
-// Camera selected → auto-fill coordinates
-cameraSelect.addEventListener('change', function () {
-    const opt = this.options[this.selectedIndex];
-    if (!opt.value) return;
-    const lat = parseFloat(opt.dataset.lat);
-    const lon = parseFloat(opt.dataset.lon);
-    if (!isNaN(lat) && !isNaN(lon)) {
-        updateCoords(lat.toFixed(7), lon.toFixed(7), true);
-        latInput.readOnly = true;
-        lonInput.readOnly = true;
-    }
-});
-
-// Re-enable coords if camera is cleared
-cameraSelect.addEventListener('change', function () {
-    if (!this.value) {
-        latInput.readOnly = false;
-        lonInput.readOnly = false;
-    }
-});
+// A picked flight auto-supplies the station — hide the manual station picker.
+function syncStationRequirement() {
+    const flightChosen = sourceInput.value === 'drone' && flightSelect.value;
+    stationGroup.style.display = flightChosen ? 'none' : '';
+    stationSelect.required = !flightChosen;
+}
+flightSelect.addEventListener('change', syncStationRequirement);
+syncStationRequirement();
 
 // ── Form validation ────────────────────────────────────────────────────────
 document.getElementById('det-form').addEventListener('submit', function (e) {
-    const src = sourceInput.value;
-    if (src === 'camera' && !cameraSelect.value) {
-        e.preventDefault();
-        alert('Odaberite lovačku kameru.');
-        return;
-    }
-    const lat = parseFloat(latInput.value);
-    const lon = parseFloat(lonInput.value);
+    const lat = parseFloat(document.getElementById('lat-input').value);
+    const lon = parseFloat(document.getElementById('lon-input').value);
     if (isNaN(lat) || isNaN(lon)) {
         e.preventDefault();
         alert('Unesite koordinate detekcije ili kliknite na kartu.');
+        return;
+    }
+    const flightChosen = sourceInput.value === 'drone' && flightSelect.value;
+    if (!flightChosen && !stationSelect.value) {
+        e.preventDefault();
+        alert('Odaberite policijsku postaju.');
         return;
     }
 });

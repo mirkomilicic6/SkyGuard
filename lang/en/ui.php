@@ -131,7 +131,6 @@ return [
             'person'     => 'Person',
             'group'      => 'Group',
             'vehicle'    => 'Vehicle',
-            'smuggling'  => 'Smuggling',
             'other'      => 'Other',
         ],
     ],

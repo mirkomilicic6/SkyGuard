@@ -58,10 +58,10 @@
             </select>
             @endif
 
-            <select name="type" class="form-control form-control-sm">
+            <select name="detection_type" class="form-control form-control-sm">
                 <option value="">— Sve vrste —</option>
-                @foreach(['person','group','vehicle','smuggling','other'] as $t)
-                    <option value="{{ $t }}" {{ request('type') === $t ? 'selected' : '' }}>
+                @foreach(['person','group','vehicle','other'] as $t)
+                    <option value="{{ $t }}" {{ request('detection_type') === $t ? 'selected' : '' }}>
                         {{ __('ui.detections.types.' . $t) }}
                     </option>
                 @endforeach
@@ -69,9 +69,16 @@
 
             <select name="source" class="form-control form-control-sm">
                 <option value="">— Svi izvori —</option>
-                <option value="drone"  {{ request('source') === 'drone'  ? 'selected' : '' }}>Dron</option>
-                <option value="camera" {{ request('source') === 'camera' ? 'selected' : '' }}>Kamera</option>
-                <option value="manual" {{ request('source') === 'manual' ? 'selected' : '' }}>Ručno</option>
+                <option value="drone"              {{ request('source') === 'drone'              ? 'selected' : '' }}>Dron</option>
+                <option value="trail_camera"       {{ request('source') === 'trail_camera'       ? 'selected' : '' }}>Kamera</option>
+                <option value="ground_observation" {{ request('source') === 'ground_observation' ? 'selected' : '' }}>Ručno (teren)</option>
+                <option value="other"              {{ request('source') === 'other'              ? 'selected' : '' }}>Ostalo</option>
+            </select>
+
+            <select name="flight_link" class="form-control form-control-sm">
+                <option value="">— Svi (let) —</option>
+                <option value="linked"   {{ request('flight_link') === 'linked'   ? 'selected' : '' }}>Povezano s letom</option>
+                <option value="unlinked" {{ request('flight_link') === 'unlinked' ? 'selected' : '' }}>Nije povezano s letom</option>
             </select>
 
             <div class="input-group input-group-sm" style="width:auto">
@@ -110,7 +117,7 @@
                     <th style="width:36px" title="Izvor"><i class="fas fa-tag"></i></th>
                     <th>{{ __('ui.detections.count') }}</th>
                     @if($showStationColumn)<th>Postaja</th>@endif
-                    <th>Let / Izvor</th>
+                    <th>Let</th>
                     <th>{{ __('ui.detections.notes') }}</th>
                     <th>Prijavio</th>
                     <th></th>
@@ -120,91 +127,70 @@
                 @forelse($detections as $det)
                 @php
                     $colors = [
-                        'person'    => ['bg'=>'#fd7e14','icon'=>'fa-user'],
-                        'group'     => ['bg'=>'#dc3545','icon'=>'fa-users'],
-                        'vehicle'   => ['bg'=>'#0d6efd','icon'=>'fa-car'],
-                        'smuggling' => ['bg'=>'#6f42c1','icon'=>'fa-box'],
-                        'other'     => ['bg'=>'#6c757d','icon'=>'fa-question-circle'],
+                        'person'  => ['bg'=>'#fd7e14','icon'=>'fa-user'],
+                        'group'   => ['bg'=>'#dc3545','icon'=>'fa-users'],
+                        'vehicle' => ['bg'=>'#0d6efd','icon'=>'fa-car'],
+                        'other'   => ['bg'=>'#6c757d','icon'=>'fa-question-circle'],
                     ];
-                    $style = $colors[$det->type] ?? $colors['other'];
+                    $style = $colors[$det->detection_type] ?? $colors['other'];
                     $src   = $det->source ?? 'drone';
-                    $srcIcon  = ['drone'=>'fa-helicopter','camera'=>'fa-camera','manual'=>'fa-walking'][$src] ?? 'fa-helicopter';
-                    $srcTitle = ['drone'=>'Dron let','camera'=>'Lovačka kamera','manual'=>'Ručno'][$src] ?? 'Dron';
+                    $srcIcon  = ['drone'=>'fa-helicopter','trail_camera'=>'fa-camera','ground_observation'=>'fa-walking'][$src] ?? 'fa-helicopter';
+                    $srcTitle = ['drone'=>'Dron let','trail_camera'=>'Kamera','ground_observation'=>'Ručno (teren)'][$src] ?? 'Dron';
                 @endphp
                 <tr>
                     <td>
                         <strong>{{ $det->detected_at->format('d.m.Y') }}</strong>
                         <small class="d-block text-muted">{{ $det->detected_at->format('H:i') }}</small>
-                        @if($det->escalation_level > 0)
-                            @php $escColors = [1=>'#f0c040',2=>'#fd7e14',3=>'#dc3545']; @endphp
-                            <span style="font-size:.7rem;color:{{ $escColors[$det->escalation_level] ?? '' }}">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                {{ ['1'=>'Upozorenje','2'=>'Intervencija','3'=>'Kritično'][$det->escalation_level] ?? '' }}
-                            </span>
-                        @endif
                     </td>
                     <td>
                         <span class="badge" style="background:{{ $style['bg'] }};color:#fff;font-size:.78rem;padding:4px 9px">
                             <i class="fas {{ $style['icon'] }} mr-1"></i>
-                            {{ __('ui.detections.types.' . $det->type) }}
+                            {{ __('ui.detections.types.' . $det->detection_type) }}
                         </span>
-                        @if($det->confirmed)
-                            <br><small class="text-success"><i class="fas fa-check-circle"></i> Potvrđeno</small>
-                        @endif
                     </td>
                     <td>
                         <span title="{{ $srcTitle }}" style="color:rgba(255,255,255,.45);font-size:.85rem">
                             <i class="fas {{ $srcIcon }}"></i>
                         </span>
                     </td>
-                    <td><strong>{{ $det->count }}</strong></td>
+                    <td><strong>{{ $det->entity_count }}</strong></td>
                     @if($showStationColumn)
                     <td>
-                        @if($src === 'drone' && $det->flight)
-                            <small class="text-muted d-block">{{ $det->flight->station->administration->name ?? '' }}</small>
-                            {{ $det->flight->station->name ?? '—' }}
-                        @elseif($src === 'camera' && $det->camera)
-                            <small class="text-muted d-block">{{ $det->camera->station?->administration?->name ?? '' }}</small>
-                            {{ $det->camera->station?->name ?? '—' }}
+                        @if($det->station)
+                            <small class="text-muted d-block">{{ $det->station->administration->name ?? '' }}</small>
+                            {{ $det->station->name }}
                         @else
                             <span class="text-muted">—</span>
                         @endif
                     </td>
                     @endif
                     <td>
-                        @if($src === 'drone' && $det->flight)
+                        @if($det->flight)
                             <a href="{{ route('flights.show', $det->flight_id) }}" class="text-info">
                                 {{ $det->flight->location ?? 'Let #' . $det->flight_id }}
                             </a>
                             @if($det->flight->drone)
                                 <small class="d-block text-muted">{{ $det->flight->drone->name }}</small>
                             @endif
-                        @elseif($src === 'camera' && $det->camera)
-                            <span class="text-warning">
-                                <i class="fas fa-camera mr-1"></i>{{ $det->camera->name }}
-                            </span>
-                            @if($det->camera->location_name)
-                                <small class="d-block text-muted">{{ $det->camera->location_name }}</small>
-                            @endif
                         @else
-                            <span class="text-muted"><i class="fas fa-walking mr-1"></i>Ručna prijava</span>
+                            <span class="text-muted">—</span>
                         @endif
                     </td>
                     <td>
-                        @if($det->notes)
-                            <small>{{ Str::limit($det->notes, 60) }}</small>
+                        @if($det->note)
+                            <small>{{ Str::limit($det->note, 60) }}</small>
                         @else
                             <span class="text-muted">—</span>
                         @endif
                     </td>
                     <td><small>{{ $det->user?->name ?? '—' }}</small></td>
                     <td class="text-nowrap">
-                        @if($src === 'drone' && $det->flight_id)
+                        @if($det->flight_id)
                         <a href="{{ route('flights.show', $det->flight_id) }}" class="btn btn-xs btn-info" title="Otvori let">
                             <i class="fas fa-eye"></i>
                         </a>
                         @endif
-                        @if(auth()->user()->hasRole('admin') || $det->user_id === auth()->id())
+                        @if(auth()->user()->hasRole('admin') || $det->created_by === auth()->id())
                         <form action="{{ route('detections.destroy', $det) }}" method="POST" style="display:inline"
                               onsubmit="return confirm('{{ __('ui.are_you_sure') }}')">
                             @csrf @method('DELETE')

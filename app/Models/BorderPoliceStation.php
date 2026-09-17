@@ -16,7 +16,7 @@ class BorderPoliceStation extends Model
      */
     public const TERRITORY_RADIUS_KM = 10.0;
 
-    protected $fillable = ['police_administration_id', 'name', 'latitude', 'longitude', 'boundary'];
+    protected $fillable = ['police_administration_id', 'name', 'latitude', 'longitude', 'boundary', 'landmark'];
 
     protected $casts = [
         'latitude'  => 'decimal:6',

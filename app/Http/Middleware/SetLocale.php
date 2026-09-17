@@ -88,15 +88,31 @@ class SetLocale
                 'icon' => 'fas fa-draw-polygon',
                 'can'  => 'manage station boundary',
             ],
-            ['header' => $t('ai_header')],
+            ['header' => $t('surveillance_header')],
             [
                 'text' => $t('analytics'),
                 'url'  => 'analytics',
                 'icon' => 'fas fa-chart-bar',
             ],
+            ['header' => $t('ai_header')],
             [
                 'text' => $t('ai_tools'),
                 'url'  => 'ai',
+                'icon' => 'fas fa-eye',
+            ],
+            [
+                'text' => $t('academic_view'),
+                'url'  => 'akademski-prikaz',
+                'icon' => 'fas fa-laptop-code',
+            ],
+            [
+                'text' => $t('footage_analysis'),
+                'url'  => 'analiza-snimke',
+                'icon' => 'fas fa-video',
+            ],
+            [
+                'text' => $t('ai_assistant'),
+                'url'  => 'ai/asistent',
                 'icon' => 'fas fa-robot',
             ],
             ['header' => $t('cameras_header'), 'can' => 'view cameras'],
