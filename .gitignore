@@ -22,3 +22,11 @@ yarn-error.log
 /.claude
 __pycache__/
 *.pyc
+
+# IDE helper (barryvdh/laravel-ide-helper) generated stub files — editor-only, not autoloaded
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# Pretrained YOLO weights — auto-downloaded by ultralytics on first use, not source
+ml-service/*.pt

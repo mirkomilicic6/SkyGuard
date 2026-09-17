@@ -64,6 +64,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('ai/predict', [AiController::class, 'predict'])->name('ai.predict');
     Route::get('ai/risk-grid', [AiController::class, 'riskGrid'])->name('ai.riskGrid');
     Route::get('analiza-snimke', [AiController::class, 'footageAnalysis'])->name('ai.footageAnalysis');
+    Route::post('analiza-snimke/analiziraj', [AiController::class, 'analyzeFootage'])->name('ai.footageAnalysis.analyze');
     Route::get('ai/clusters', [AiController::class, 'clusters'])->name('ai.clusters');
     Route::get('akademski-prikaz', [AiController::class, 'academic'])->name('academic.index');
     Route::get('ai/zones/flight-stats', [AiController::class, 'zoneFlightStats'])->name('ai.zoneFlightStats');

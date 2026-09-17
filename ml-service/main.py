@@ -1,4 +1,52 @@
-from fastapi import FastAPI, HTTPException
+"""
+DroneManager ML mikroservis (FastAPI, Python). Poziva ga Laravel aplikacija preko
+običnog HTTP-a (vidi app/Http/Controllers/AiController.php i ChatController.php) i
+radi izravno nad istom MySQL bazom preko pymysql — nema dijeljenog koda s Laravelom,
+samo ista baza. Razlog zašto je ovo poseban servis, a ne sve u PHP-u: cijeli
+ML/data-science alat (pandas, scikit-learn) je Python-only. Laravel ostaje
+zadužen za autentifikaciju/autorizaciju (koji korisnik smije vidjeti koju postaju/
+upravu) i UI; ovaj servis samo prima već filtrirane upite (station_id ili
+administration_id) i vraća JSON.
+
+Endpointi su grupirani po tome kojem od nekoliko različitih pristupa pripadaju —
+vidi i karticu "Usporedba pristupa" na stranici "ML analiza" u appu za kratku
+kvalitativnu usporedbu ovih pristupa jedan pored drugog:
+
+1) DBSCAN + akademski pipeline (zona × dan × vremenski blok) — glavni, akademski
+   najjači pristup, s pravom nadziranom evaluacijom (kronološki split):
+   /clusters, /zones/flight-stats, /zones/dataset-preview, /zone-model-metrics,
+   /zone-predictions. Sama logika (feature engineering, 5 modela, predikcija)
+   živi u zones.py; evaluate_model() dijeli s ml_common.py.
+
+2) Mrežni, presence-only pristup (RandomForest po ćelijama prostorne mreže,
+   MaxEnt-stil kao u modeliranju rasprostranjenosti vrsta): /risk-grid — trenira
+   se na stvarnim detekcijama naspram sintetičke, nasumične "pozadine", i boduje
+   CIJELU mrežu, ne samo već poznata žarišta. Evaluacija (/model-metrics) je
+   nasumičan (ne kronološki) split — namjerno slabija, dev-only dijagnostika.
+
+3) Brza heuristika, bez ikakvog učenja: /predict — samo prebrojava obližnje i
+   vremenski slične povijesne detekcije. Nije ML model.
+
+4) Čisto deskriptivna statistika, bez ikakvog modela: /risk-matrix, /insights
+
+5) /model-metrics — dev-only dijagnostika za pristup (2) i DBSCAN kvalitetu
+   klastera; ne zamjenjuje formalnu evaluaciju (ta postoji za pristup (1)).
+
+6) Analiza snimke (računalni vid) — /footage/analyze: detekcija osoba i
+   nekoliko vrsta životinja na uploadanom videu pomoću pretreniranog YOLOv8
+   modela (COCO težine, vidi vision.DETECT_CLASSES), ili termalnog modela
+   (thermal=true — pitangent-ds/YOLOv8-human-detection-thermal, samo osoba)
+   za infracrvene/FLIR snimke, gdje COCO model loše radi. Potpuno odvojeno
+   od svega gore — jedino mjesto u servisu koje radi nad stvarnim video
+   zapisom, ne nad GPS/vremenskim zapisima detekcija.
+   Logika je u vision.py.
+
+Sve get_*() funkcije ispod dohvaćaju podatke iz baze, opcionalno filtrirano po
+station_id (jedna postaja) ili administration_id (sve postaje jedne uprave) —
+isti model scopinga kao StationScoped trait na Laravel strani.
+"""
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import pymysql
 import pandas as pd
@@ -10,11 +58,12 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import silhouette_score
-from scipy.stats import gaussian_kde
 from dotenv import load_dotenv
 from ml_common import evaluate_model
 import zones as zones_mod
+import vision as vision_mod
 import os
+import tempfile
 
 load_dotenv()
 
@@ -132,6 +181,11 @@ def health():
 # ── DBSCAN clusters ───────────────────────────────────────────────────────────
 @app.get("/clusters")
 def clusters(station_id: int = None, administration_id: int = None, eps_km: float = 2.0, min_samples: int = 3):
+    """DBSCAN — nenadzirano učenje. Grupira obližnje detekcije u "žarišta" bez
+    ikakvih oznaka/labela. eps_km = najveća udaljenost da se dvije detekcije
+    smatraju susjedima; min_samples = koliko ih treba da bi tvorile klaster.
+    Detekcije koje ne upadnu ni u jednu dovoljno gustu grupu vraćaju se kao
+    "noise" (šum) — nisu na silu gurnute u najbliži klaster."""
     df = get_detections(station_id, administration_id)
     computed = zones_mod.compute_zones(df, eps_km, min_samples)
 
@@ -160,6 +214,10 @@ def _zone_pipeline_inputs(station_id: int = None, administration_id: int = None)
 # ── Zone vs. GPX flight comparison ─────────────────────────────────────────────
 @app.get("/zones/flight-stats")
 def zones_flight_stats(station_id: int = None, administration_id: int = None):
+    """Za svaku DBSCAN zonu: koliko je letova prošlo kroz nju, koliko minuta
+    nadzora, i detekcija po satu leta — "koliko smo zapravo pazili na ovu
+    zonu", ne samo broj detekcija. Koristi ga i sam dataset builder ispod, i
+    RecommendationService::forDbscanZones() na Laravel strani."""
     df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"zones": [], "message": "Nedovoljno detekcija za formiranje zona."}
@@ -170,6 +228,10 @@ def zones_flight_stats(station_id: int = None, administration_id: int = None):
 # ── Supervised dataset preview (zone × day × time-block) ──────────────────────
 @app.get("/zones/dataset-preview")
 def zones_dataset_preview(station_id: int = None, administration_id: int = None, rows: int = 20):
+    """Nasumičan uzorak (+ sažetak) skupa podataka koji zones_mod.build_zone_timeline_dataset()
+    stvarno gradi za nadzirano učenje (puna logika feature engineeringa je u
+    zones.py) — ovo puni karticu "Izvorni podaci" na ML analiza stranici, da
+    se vidi točno na čemu modeli iz koraka 3 uče."""
     df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"rows": [], "n_rows": 0, "n_positive": 0, "message": "Nedovoljno detekcija za formiranje zona."}
@@ -189,6 +251,11 @@ def zones_dataset_preview(station_id: int = None, administration_id: int = None,
 # ── 5-model comparison on the zone timeline dataset (chronological split) ─────
 @app.get("/zone-model-metrics")
 def zone_model_metrics(station_id: int = None, administration_id: int = None):
+    """Trenira i evaluira svih 5 kandidatnih modela (logika u zones.py's
+    compare_zone_models()) na zone-timeline skupu, s kronološkim train/test
+    splitom (80/20 po datumu), i vraća metrike + koji je pobjednik po F1.
+    Ovo je najskuplja operacija u cijelom servisu (~30-45s), zato se rezultat
+    kešira po obliku skupa (compare_zone_models_cached)."""
     df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"trained": False, "message": "Nedovoljno detekcija za formiranje zona."}
@@ -200,6 +267,10 @@ def zone_model_metrics(station_id: int = None, administration_id: int = None):
 @app.get("/zone-predictions")
 def zone_predictions(station_id: int = None, administration_id: int = None,
                       model: str = None, dow: int = None, block: int = None):
+    """Predviđena vjerojatnost detekcije po zoni za zadani dan/blok (ili
+    'sada' ako se ne pošalje), koristeći bilo koji model koji /zone-model-metrics
+    proglasi pobjednikom (ili eksplicitno traženi `model`). Ovo puni "Prediktivnu
+    kartu" (korak 4) na ML analiza stranici."""
     df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"zones": [], "message": "Nedovoljno detekcija za formiranje zona."}
@@ -222,6 +293,10 @@ def zone_predictions(station_id: int = None, administration_id: int = None,
 # ── Risk matrix (hour × weekday) ──────────────────────────────────────────────
 @app.get("/risk-matrix")
 def risk_matrix(station_id: int = None, administration_id: int = None):
+    """Čisto deskriptivna statistika, bez ikakvog modela/učenja: 24×7 mreža
+    (sat × dan u tjednu) broja detekcija, blago ponderirana brojem entiteta po
+    detekciji, pa normalizirana na 0-100 da izgleda jednako čitljivo bez
+    obzira koliko je ukupno detekcija na toj postaji/upravi."""
     df = get_detections(station_id, administration_id)
     if df.empty:
         return {"matrix": [], "peak_hour": None, "peak_day": None}
@@ -256,6 +331,9 @@ def risk_matrix(station_id: int = None, administration_id: int = None):
 # ── Type breakdown + trend ────────────────────────────────────────────────────
 @app.get("/insights")
 def insights(station_id: int = None, administration_id: int = None):
+    """Deskriptivni sažetak (bez ML-a): ukupno po vrsti/izvoru, plus jednostavan
+    linearni trend (nagib pravca kroz zadnjih 30 dnevnih brojeva detekcija) da
+    se kaže je li trend "rast"/"pad"/"stabilan". Puni KPI kartice na Pregledu/Analitici."""
     df = get_detections(station_id, administration_id)
     if df.empty:
         return {}
@@ -289,7 +367,11 @@ def insights(station_id: int = None, administration_id: int = None):
 @app.get("/predict")
 def predict(lat: float, lon: float, hour: int, dow: int, station_id: int = None, administration_id: int = None):
     """
-    Simple proximity + temporal risk score.
+    NIJE trenirani model — ovo je ručna heuristika, samo prebrojavanje.
+    Prostorni dio: koliko je povijesnih detekcija unutar 5 km (max 60 bodova).
+    Vremenski dio: koliko ih je bilo u sličan sat (±1) i sličan dan u tjednu
+    (±1) (max 40 bodova). Zbroj = risk 0-100. Nema učenja, generalizacije ni
+    obrazaca — samo brz odgovor za jednu konkretnu točku na karti.
     dow: 0=Mon … 6=Sun
     Returns risk 0–100 with contributing factors.
     """
@@ -757,144 +839,6 @@ def risk_grid(station_id: int = None, administration_id: int = None,
     }
 
 
-# ── Patrol allocation via UCB1 (reinforcement learning) ───────────────────────
-@app.get("/patrol-bandit")
-def patrol_bandit(station_id: int = None, administration_id: int = None,
-                   cell_km: float = None, corridor_km: float = 20.0):
-    """
-    Frames "where to patrol next" as a multi-armed bandit: each grid cell is
-    an arm, a "pull" is a GPX point recorded in that cell (a patrol visit),
-    and a "success" is a detection recorded there. Unlike the risk-grid
-    (a trained classifier) or RecommendationService (plain rate vs. average),
-    this is genuine reinforcement learning — UCB1 explicitly scores the
-    exploration/exploitation trade-off, so a cell that has never been
-    patrolled isn't silently ignored just because it has no history; it's
-    flagged as the highest-value unknown instead.
-    """
-    df = get_detections(station_id, administration_id)
-    if len(df) < 8:
-        return {"cells": [], "recommend_explore": [],
-                "message": "Nedovoljno detekcija za izgradnju mreže (potrebno min. 8)"}
-
-    grid = _build_grid(df, cell_km, corridor_km)
-    if grid is None:
-        return {"cells": [], "recommend_explore": [],
-                "message": "Područje je preveliko za odabranu veličinu ćelije ili nema ćelija unutar pojasa uz granicu"}
-
-    bbox, cell_km = grid["bbox"], grid["cell_km"]
-    lat_step, lon_step = grid["lat_step"], grid["lon_step"]
-    lats, lons = grid["lats"], grid["lons"]
-    flat_lat, flat_lon = grid["flat_lat"], grid["flat_lon"]
-    keep_lat_idx, keep_lon_idx = grid["keep_lat_idx"], grid["keep_lon_idx"]
-    n_cells = grid["n_cells"]
-    shape = (len(lats), len(lons))
-
-    flights_df = get_flight_points(station_id, administration_id)
-    pulls_grid = _bin_counts_to_grid(
-        flights_df["latitude"].astype(float).to_numpy(), flights_df["longitude"].astype(float).to_numpy(),
-        bbox, lat_step, lon_step, shape,
-    )
-    successes_grid = _bin_counts_to_grid(
-        df["latitude"].astype(float).to_numpy(), df["longitude"].astype(float).to_numpy(),
-        bbox, lat_step, lon_step, shape,
-    )
-
-    pulls = pulls_grid[keep_lat_idx, keep_lon_idx]
-    successes = successes_grid[keep_lat_idx, keep_lon_idx]
-    total_pulls = float(pulls.sum())
-
-    cells = []
-    for i in range(n_cells):
-        n = float(pulls[i])
-        explored = n > 0
-        mean_reward = (successes[i] / n) if explored else None
-        # UCB1: mean_reward + sqrt(2 ln N / n) — unexplored cells (n=0) have
-        # no defined score, so they're ranked ahead of every scored cell
-        # instead of being assigned an arbitrary number.
-        ucb_score = (mean_reward + np.sqrt(2 * np.log(max(total_pulls, 1)) / n)) if explored else None
-
-        cells.append({
-            "lat": round(float(flat_lat[i]), 5),
-            "lon": round(float(flat_lon[i]), 5),
-            "n_pulls": int(n),
-            "successes": int(successes[i]),
-            "mean_reward": round(mean_reward, 3) if explored else None,
-            "ucb_score": round(float(ucb_score), 3) if explored else None,
-            "explored": explored,
-        })
-
-    # Unexplored cells first (highest exploration value), then by UCB score.
-    recommend_explore = sorted(
-        cells, key=lambda c: (c["explored"], -(c["ucb_score"] or 0))
-    )[:8]
-
-    return {
-        "cell_km": round(float(cell_km), 2),
-        "cells": cells,
-        "recommend_explore": recommend_explore,
-        "total_pulls": int(total_pulls),
-        "border": {
-            "hr_bih": [list(p) for p in BORDER_HR_BIH],
-            "hr_srb": [list(p) for p in BORDER_HR_SRB],
-        },
-    }
-
-
-# ── Kernel Density Estimation heatmap ──────────────────────────────────────────
-@app.get("/kde-heatmap")
-def kde_heatmap(station_id: int = None, administration_id: int = None,
-                 cell_km: float = None, corridor_km: float = 20.0):
-    """
-    Kernel Density Estimation over every detection regardless of source
-    (drone, trail camera, ground observation) — a genuine statistical
-    density-smoothing technique. Distinct from DBSCAN (density-based
-    *clustering* into discrete groups) and from the Leaflet.heat plugin used
-    elsewhere in the app (a simple per-point radius accumulation with no
-    real bandwidth/kernel math). Uses scipy's Gaussian KDE with Scott's rule
-    bandwidth (no manual tuning), evaluated on the same border-clipped grid
-    as risk-grid/patrol-bandit so all three "circle" views line up.
-    """
-    df = get_detections(station_id, administration_id)
-    if len(df) < 5:
-        return {"points": [], "message": "Nedovoljno detekcija za KDE (potrebno min. 5)"}
-
-    # Finer grid than risk-grid/patrol-bandit (which are tuned for readable
-    # discrete squares) — KDE reads as a proper smooth heatmap only with
-    # enough evaluation points.
-    grid = _build_grid(df, cell_km, corridor_km, divisor=50.0)
-    if grid is None:
-        return {"points": [], "message": "Područje je preveliko za odabranu veličinu ćelije ili nema ćelija unutar pojasa uz granicu"}
-
-    flat_lat, flat_lon = grid["flat_lat"], grid["flat_lon"]
-
-    coords = np.vstack([df["latitude"].astype(float).to_numpy(), df["longitude"].astype(float).to_numpy()])
-    weights = df["count"].astype(float).to_numpy()  # entity_count as the KDE sample weight
-
-    try:
-        kde = gaussian_kde(coords, weights=weights)
-        density = kde(np.vstack([flat_lat, flat_lon]))
-        bandwidth = round(float(kde.factor), 4)
-    except np.linalg.LinAlgError:
-        return {"points": [], "message": "Detekcije su prostorno preusko raspoređene za KDE (singularna kovarijanca)"}
-
-    density = density / max(float(density.max()), 1e-12) * 100  # normalise 0-100
-
-    points = [
-        [round(float(flat_lat[i]), 5), round(float(flat_lon[i]), 5), round(float(density[i]), 1)]
-        for i in range(len(flat_lat))
-    ]
-
-    return {
-        "points": points,
-        "bandwidth": bandwidth,
-        "trained_on": int(len(df)),
-        "border": {
-            "hr_bih": [list(p) for p in BORDER_HR_BIH],
-            "hr_srb": [list(p) for p in BORDER_HR_SRB],
-        },
-    }
-
-
 # ── Model diagnostics (dev mode) ──────────────────────────────────────────────
 FEATURE_NAMES = ["lat", "lon", "hour_sin", "hour_cos", "dow_sin", "dow_cos"]
 
@@ -1014,3 +958,36 @@ def model_metrics(station_id: int = None, administration_id: int = None,
         "risk_model": risk_model,
         "clustering": clustering,
     }
+
+
+# ── Footage analysis: person + wildlife detection on uploaded video (YOLOv8) ─
+@app.get("/footage/analyze")
+def footage_analyze_missing():
+    """GET on this path always means the client tried to open it directly
+    instead of POSTing a video — a clearer error than FastAPI's default
+    405 for people poking at the endpoint by hand."""
+    raise HTTPException(status_code=405, detail="Pošaljite video kao multipart POST na /footage/analyze.")
+
+
+@app.post("/footage/analyze")
+async def footage_analyze(video: UploadFile = File(...), thermal: bool = Form(False)):
+    """
+    Sprema uploadani video u privremenu datoteku i pušta ga kroz
+    vision.analyze_video() — YOLOv8, osoba + vision.DETECT_CLASSES životinje
+    za obične snimke, ili thermal=true za termalni model (samo osoba, vidi
+    vision.THERMAL_CLASSES). Video se ne obrađuje frame-po-frame (presporo na
+    CPU-u) nego se uzorkuje na ~2 frame/sekundi — vidi vision.py za detalje i
+    zašto se to na frontend strani i dalje doživljava kao "uživo" prikaz
+    tijekom reprodukcije.
+    """
+    suffix = os.path.splitext(video.filename or "")[1] or ".mp4"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await video.read())
+        tmp_path = tmp.name
+
+    try:
+        result = vision_mod.analyze_video(tmp_path, thermal=thermal)
+    finally:
+        os.unlink(tmp_path)
+
+    return result

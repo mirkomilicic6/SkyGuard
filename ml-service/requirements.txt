@@ -6,3 +6,6 @@ pandas==3.0.2
 pymysql==1.1.2
 python-dotenv==1.2.2
 numpy
+ultralytics==8.4.154
+opencv-python==5.0.0.93
+python-multipart==0.0.32

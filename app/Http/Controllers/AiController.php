@@ -120,6 +120,39 @@ class AiController extends Controller
         return view('ai.footage');
     }
 
+    /**
+     * Forwards an uploaded video to ml-service's YOLOv8 detection endpoint
+     * and returns its per-sampled-frame box data as-is. `thermal` switches
+     * to the model fine-tuned on thermal/infrared footage (person-only) —
+     * the regular COCO model generalises poorly to that (very different
+     * visual appearance from ordinary colour video). Long timeout — CPU
+     * inference on even a short clip takes real time (see vision.py for the
+     * sampling strategy that keeps it from taking much longer than that).
+     */
+    public function analyzeFootage(Request $request)
+    {
+        $this->denyViewer();
+
+        $request->validate([
+            'video'   => 'required|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/webm|max:102400',
+            'thermal' => 'nullable|boolean',
+        ]);
+
+        try {
+            $file = $request->file('video');
+            $result = Http::timeout(300)
+                ->attach('video', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                ->post("{$this->base}/footage/analyze", [
+                    'thermal' => $request->boolean('thermal') ? 'true' : 'false',
+                ])
+                ->json();
+
+            return response()->json($result);
+        } catch (\Throwable) {
+            return response()->json(['error' => 'ML servis nedostupan ili je obrada predugo trajala.'], 503);
+        }
+    }
+
     public function academic()
     {
         return view('academic.index');
