@@ -1,66 +1,46 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SkyGuard
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+SkyGuard je web aplikacija za upravljanje dronovima i lovnim kamerama te podršku odlučivanju u nadzoru državne granice. Razvijena je kao projekt 2. godine diplomskog studija Primjena umjetne inteligencije. Cilj aplikacije je povezivanje evidencije letova i detekcija s prostornom analizom, strojnim učenjem i AI asistentom.
 
-## About Laravel
+Sustav je dizajniran da analizira povijesne detekcije i GPX putanje letova kako bi prepoznao žarišta aktivnosti, procijenio mogućnost budućih detekcija i predložio područja za pojačanje ili smanjenje nadzora.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Funkcionalnosti:
++ Upravljanje flotom: evidencija dronova, letova s GPX putanjom i grafom visine te kvarova i održavanja.
++ Lovne kamere: evidencija lokacija i promjena, uz geografska ograničenja postavljanja.
++ Detekcije: unos osoba, skupina, vozila i ostalih opažanja iz različitih izvora, uz filtriranje po vrsti, izvoru, vremenu i postaji.
++ Organizacijska struktura: policijske uprave i granične postaje, korisničke uloge i ograničavanje pristupa podacima.
++ Analitika i izvješća: statistika detekcija i letova, vremenski trendovi, mjesečna izvješća i interaktivne karte.
++ ML analiza: DBSCAN žarišta, usporedba pet modela strojnog učenja, predikcije po zonama i prikaz preporuka nadzora.
++ AI asistent: razgovor na hrvatskom jeziku uz dohvat podataka iz sustava i prikaz rezultata na karti, dostupan kao plutajući widget i zasebna stranica.
++ AI i strojno učenje
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Aplikacija uključuje tri pristupa analizi:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
++ Analiza po DBSCAN zonama
++ Prostorno bliske detekcije grupiraju se u žarišta. Za svaku zonu, datum i četverosatni blok izrađuje se skup podataka s povijesnim značajkama detekcija i letova. Uspoređuju se Random Forest, Gradient Boosting, logistička regresija, k-NN i višeslojni perceptron (MLP), uz vremenski uređenu podjelu podataka. Model za predikciju bira se prema F1-mjeri, uz ROC-AUC kao dodatni kriterij.
++ Prostorna mreža rizika
++ Random Forest razlikuje zabilježene detekcije od nasumično generiranih pozadinskih primjera. Rezultat je relativni indeks rizika po ćelijama graničnog koridora, koji se uspoređuje s pokrivenošću GPX točkama.
++ Heuristička procjena lokacije
++ Brza procjena temeljena na obližnjim povijesnim detekcijama i vremenskim obrascima, bez treniranja modela.
 
-## Learning Laravel
+AI asistent koristi Anthropic Claude API i pozivanje alata (tool-use) za dohvat rezultata analiza i statistike iz aplikacije.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Tehnologije i arhitektura:
+Dio sustava	Tehnologije
+Web aplikacija	Laravel 11, PHP 8.2+, MySQL
+Korisničko sučelje	AdminLTE 3, Leaflet.js, Chart.js
+Uloge i ovlasti	Spatie Laravel Permission
+Obrada putanja	Vlastiti GPX parser
+ML servis	Python, FastAPI, pandas, NumPy, scikit-learn
+Pristup bazi iz ML servisa	PyMySQL
+AI asistent	Anthropic Claude API, integriran kroz Laravel
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+Laravel aplikacija i Python ML servis pokreću se kao zasebni procesi. Aplikacija poziva ML servis putem REST API-ja, a oba dijela pristupaju istoj MySQL bazi. Takva arhitektura omogućuje zaseban razvoj i nadogradnju ML komponente.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Podaci i ograničenja
 
-## Laravel Sponsors
+Projekt koristi sintetičke podatke za razvoj, testiranje i demonstraciju. AI asistent dohvaća podatke pohranjene u bazi; oni ne predstavljaju stvarne operativne događaje.
+Predikcije su eksperimentalne i služe kao podrška odlučivanju. Relativni indeks rizika nije potvrđena vjerojatnost događaja, a izostanak zabilježene detekcije ne dokazuje odsustvo aktivnosti.
+Povijesne značajke u analizi po zonama pomaknute su unatrag, ali DBSCAN zone trenutačno se određuju iz cijelog dostupnog skupa. Za strogu evaluaciju budućih predikcija potrebno je i formiranje zona ograničiti na podatke dostupne prije testnog razdoblja. Procjena trajanja nadzora po zonama također koristi pojednostavljenu dodjelu cijelog leta zoni kroz koju prolazi.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Prva faza projekta obuhvaća strukturirane podatke o detekcijama i GPX zapisima letova, a druga faza projekta će biti implementacija YOLO algoritma za obradu video zapisa sa letjelica sa mogućnošću porepoznavanja osoba/vozila, kao i automatsko spremanje koordinata detekcije. Na temelju nedograđenom projekta ću raditi i diplomski rad.
