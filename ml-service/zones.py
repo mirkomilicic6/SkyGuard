@@ -1,7 +1,7 @@
 """
 DBSCAN-hotspot ("zone") pipeline: stable K1..KN zone labeling, zone-vs-flight
 comparison, a real (zone, day, time-block) supervised dataset built from
-actual historical outcomes (no synthetic background sampling), a 5-model
+actual historical outcomes (no synthetic background sampling), a 4-model
 comparison with a chronological train/test split, and probability
 predictions from the best-performing model.
 
@@ -14,7 +14,6 @@ from sklearn.cluster import DBSCAN
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_sample_weight
 
@@ -327,12 +326,10 @@ MODEL_SPECS = [
         n_estimators=200, max_depth=8, min_samples_leaf=4, random_state=42, n_jobs=-1)),
     ("gradient_boosting", "Gradient Boosting", False, lambda: GradientBoostingClassifier(
         n_estimators=150, max_depth=3, random_state=42)),
-    ("mlp", "MLP (neuronska mreža)", True, lambda: MLPClassifier(
-        hidden_layer_sizes=(32, 16), max_iter=500, random_state=42)),
 ]
 
 
-# ── Phase 4: 5-model comparison, chronological split ───────────────────────────
+# ── Phase 4: 4-model comparison, chronological split ───────────────────────────
 def compare_zone_models(dataset: pd.DataFrame) -> dict:
     if dataset.empty or dataset["label"].sum() < 5:
         return {"trained": False, "message": "Nedovoljno pozitivnih primjera za pouzdanu procjenu modela."}
@@ -370,7 +367,7 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
     }
 
 
-# Training all 5 models is expensive (~tens of seconds); a single academic
+# Training all 4 models is expensive (~tens of seconds); a single academic
 # page load hits both /zone-model-metrics and /zone-predictions (the latter
 # needs "best_model" whenever no explicit model is requested), so an
 # in-process cache keyed by dataset shape avoids paying for it twice per load.

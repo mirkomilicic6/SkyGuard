@@ -30,3 +30,8 @@ _ide_helper_models.php
 
 # Pretrained YOLO weights — auto-downloaded by ultralytics on first use, not source
 ml-service/*.pt
+
+# Scratch scripts/assets for generating thesis report addenda — not app source
+/_gen_addenda*.py
+/_tmp_final_*.txt
+/_report_assets/

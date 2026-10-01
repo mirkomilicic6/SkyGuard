@@ -83,7 +83,6 @@ class FlightController extends Controller
     public function show(Flight $flight)
     {
         $this->authorizeAccess($flight);
-
         $flight->load(['drone', 'pilot', 'gpxPoints']);
         return view('flights.show', compact('flight'));
     }

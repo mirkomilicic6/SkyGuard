@@ -15,7 +15,7 @@ kvalitativnu usporedbu ovih pristupa jedan pored drugog:
 1) DBSCAN + akademski pipeline (zona × dan × vremenski blok) — glavni, akademski
    najjači pristup, s pravom nadziranom evaluacijom (kronološki split):
    /clusters, /zones/flight-stats, /zones/dataset-preview, /zone-model-metrics,
-   /zone-predictions. Sama logika (feature engineering, 5 modela, predikcija)
+   /zone-predictions. Sama logika (feature engineering, 4 modela, predikcija)
    živi u zones.py; evaluate_model() dijeli s ml_common.py.
 
 2) Mrežni, presence-only pristup (RandomForest po ćelijama prostorne mreže,

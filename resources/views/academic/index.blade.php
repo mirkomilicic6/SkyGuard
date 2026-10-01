@@ -175,7 +175,7 @@
             <tbody>
                 <tr>
                     <td><b>Vrsta učenja</b></td>
-                    <td>Nenadzirano (DBSCAN) + nadzirano (5 modela)</td>
+                    <td>Nenadzirano (DBSCAN) + nadzirano (4 modela)</td>
                     <td>Nadzirano, presence-only (MaxEnt-stil, kao u modeliranju rasprostranjenosti vrsta)</td>
                     <td>Nema učenja — ručno pravilo</td>
                 </tr>
