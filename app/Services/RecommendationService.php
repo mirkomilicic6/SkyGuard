@@ -28,8 +28,8 @@ class RecommendationService
         ]);
 
         try {
-            $flightStats = Http::timeout(30)->get("{$base}/zones/flight-stats", $param)->json('zones') ?? [];
-            $predictions = Http::timeout(60)->get("{$base}/zone-predictions", $param)->json('zones') ?? [];
+            $flightStats = Http::timeout(60)->get("{$base}/zones/flight-stats", $param)->json('zones') ?? [];
+            $predictions = Http::timeout(90)->get("{$base}/zone-predictions", $param)->json('zones') ?? [];
         } catch (\Throwable) {
             return collect();
         }

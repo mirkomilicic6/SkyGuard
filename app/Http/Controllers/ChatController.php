@@ -274,11 +274,11 @@ PROMPT;
         try {
             return match ($name) {
                 'get_risk_grid' => $this->enrichRiskGrid(
-                    $this->trimRiskGrid(Http::timeout(15)->get("{$this->mlBase}/risk-grid", $query)->json()),
+                    $this->trimRiskGrid(Http::timeout(60)->get("{$this->mlBase}/risk-grid", $query)->json()),
                     $stationId, $adminId
                 ),
                 'get_clusters' => $this->enrichClusters(
-                    $this->trimClusters(Http::timeout(8)->get("{$this->mlBase}/clusters", $query)->json()),
+                    $this->trimClusters(Http::timeout(60)->get("{$this->mlBase}/clusters", $query)->json()),
                     $stationId, $adminId
                 ),
                 'get_insights' => Http::timeout(8)->get("{$this->mlBase}/insights", $query)->json(),

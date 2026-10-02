@@ -67,7 +67,7 @@ class AiController extends Controller
             : 0;
 
         try {
-            $clusters  = Http::timeout(6)->get("{$this->base}/clusters{$this->scopeParam()}")->json();
+            $clusters  = Http::timeout(15)->get("{$this->base}/clusters{$this->scopeParam()}")->json();
             $zoneCount = count($clusters['clusters'] ?? []);
             $mlOnline  = true;
         } catch (\Throwable) {
@@ -111,12 +111,17 @@ class AiController extends Controller
 
     public function riskGrid()
     {
-        return $this->proxy('/risk-grid', 15);
+        return $this->proxy('/risk-grid', 60);
     }
 
     public function clusters()
     {
-        return $this->proxy('/clusters', 8);
+        // DBSCAN over every detection is cheap once cached in-process by
+        // ml-service, but a cold run (service just (re)started) scans the
+        // full table — tens of seconds at the current dataset size, so this
+        // needs real headroom rather than the old 8s tuned for a far smaller
+        // dataset.
+        return $this->proxy('/clusters', 120);
     }
 
     public function footageAnalysis()
@@ -164,17 +169,21 @@ class AiController extends Controller
 
     public function zoneFlightStats()
     {
-        return $this->proxy('/zones/flight-stats', 30);
+        return $this->proxy('/zones/flight-stats', 60);
     }
 
     public function zoneDatasetPreview()
     {
-        return $this->proxy('/zones/dataset-preview', 20);
+        return $this->proxy('/zones/dataset-preview', 60);
     }
 
     public function zoneModelMetrics()
     {
-        return $this->proxy('/zone-model-metrics', 90);
+        // Trains all 4 models on the full zone×day×block panel — a few
+        // minutes at the current dataset size (was tens of seconds on the
+        // much smaller original dataset), so this needs the most headroom
+        // of any ML call here.
+        return $this->proxy('/zone-model-metrics', 240);
     }
 
     public function zonePredictions(Request $request)
@@ -192,7 +201,7 @@ class AiController extends Controller
         ], fn ($v) => $v !== null);
 
         try {
-            $result = Http::timeout(60)->get("{$this->base}/zone-predictions", $params)->json();
+            $result = Http::timeout(120)->get("{$this->base}/zone-predictions", $params)->json();
             return response()->json($result);
         } catch (\Throwable) {
             return response()->json(['message' => 'ML servis nedostupan'], 503);
