@@ -349,7 +349,7 @@ class DashboardController extends Controller
         $params  = $adminId ? ['administration_id' => $adminId] : ['station_id' => $station->id];
 
         try {
-            $response = Http::timeout(6)->get('http://127.0.0.1:8001/risk-grid', $params);
+            $response = Http::timeout(6)->get(config('services.ml.url') . '/risk-grid', $params);
             if (!$response->successful()) {
                 return null;
             }

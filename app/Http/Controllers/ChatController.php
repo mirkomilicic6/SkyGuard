@@ -11,7 +11,12 @@ use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
-    private string $mlBase = 'http://127.0.0.1:8001';
+    private string $mlBase;
+
+    public function __construct()
+    {
+        $this->mlBase = config('services.ml.url');
+    }
 
     /** Full-page version of the assistant — same /chat endpoint, bigger UI. */
     public function page()

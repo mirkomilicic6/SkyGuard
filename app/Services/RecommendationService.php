@@ -21,7 +21,7 @@ class RecommendationService
      */
     public function forDbscanZones(?int $administrationId = null, ?int $stationId = null): Collection
     {
-        $base = 'http://127.0.0.1:8001';
+        $base = config('services.ml.url');
         $param = array_filter([
             'administration_id' => $administrationId,
             'station_id'        => $administrationId ? null : $stationId,

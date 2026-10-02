@@ -13,8 +13,12 @@ class AiController extends Controller
 {
     use StationScoped;
 
-    private string $base = 'http://127.0.0.1:8001';
+    private string $base;
 
+    public function __construct()
+    {
+        $this->base = config('services.ml.url');
+    }
     /** `?station_id=`/`?administration_id=` query fragment scoped to the current user. */
     private function scopeParam(string $prefix = '?'): string
     {
