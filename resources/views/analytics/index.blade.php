@@ -374,8 +374,11 @@ function renderAllLayers() {
     renderRoutes();
     renderZones();
     syncLayerVisibility();
+    const routesNote = (spData.routes_total ?? spData.routes.length) > spData.routes.length
+        ? ` (prikazano ${spData.routes_shown} od ${spData.routes_total} najnovijih)`
+        : '';
     document.getElementById('spFilteredCount').textContent =
-        `${spData.points.length} detekcija · ${spData.routes.length} ruta leta`;
+        `${spData.points.length} detekcija · ${spData.routes.length} ruta leta${routesNote}`;
 }
 
 function spBuildQuery() {

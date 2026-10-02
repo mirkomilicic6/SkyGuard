@@ -180,12 +180,23 @@ class AnalyticsController extends Controller
 
         // Routes: GPX for flights in the same station+period scope. Type/
         // source/time-block are detection-level attributes and don't apply
-        // to flights, so only station+period narrow this layer.
-        $routes = Flight::query()
+        // to flights, so only station+period narrow this layer. Capped to
+        // the most recent matches — with tens of thousands of flights now
+        // in the dataset, eager-loading every GPX point for every match
+        // exhausted the web request's memory limit (same issue fixed on the
+        // dashboard's "Pregled cijele mreže" map — see that commit).
+        $routesQuery = Flight::query()
             ->when($scopedIds !== null, fn($q) => $q->whereIn('station_id', $scopedIds))
             ->when($request->filled('station_id'), fn($q) => $q->where('station_id', $request->integer('station_id')))
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('flight_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('flight_date', '<=', $request->date('date_to')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('flight_date', '<=', $request->date('date_to')));
+
+        $routesTotal = (clone $routesQuery)->count();
+        $routesLimit = 500;
+
+        $routes = $routesQuery
+            ->orderByDesc('flight_date')
+            ->limit($routesLimit)
             ->with(['gpxPoints' => fn($q) => $q->orderBy('point_order')->select('id', 'flight_id', 'latitude', 'longitude')])
             ->get()
             ->map(fn($f) => $f->gpxPoints->map(fn($p) => [(float) $p->latitude, (float) $p->longitude])->values())
@@ -206,6 +217,12 @@ class AnalyticsController extends Controller
                 'radius_km' => BorderPoliceStation::TERRITORY_RADIUS_KM,
             ])->values();
 
-        return response()->json(['points' => $points, 'routes' => $routes, 'zones' => $zones]);
+        return response()->json([
+            'points' => $points,
+            'routes' => $routes,
+            'routes_total' => $routesTotal,
+            'routes_shown' => $routes->count(),
+            'zones' => $zones,
+        ]);
     }
 }
