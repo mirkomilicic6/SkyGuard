@@ -81,10 +81,16 @@
         <div>
             <div class="db-card-title"><i class="fas fa-balance-scale mr-2" style="color:var(--gold)"></i>3. Usporedba modela (nadzirano učenje)</div>
             <div class="db-card-subtitle">
-                Trenira se i testira kronološki (80/20 po datumu, ne nasumično) da rezultati ne ispadnu umjetno dobri. Najbolji
-                model bira se po F1, ne po accuracy ni precisionu — model koji nikad ne javi opasnost imao bi accuracy ~99% i
-                precision 0. Nizak precision čak i kod najboljeg modela je očekivan: stvarnih pozitivnih primjera ima jako malo,
-                pa i mala stopa lažnih uzbuna na ogromnoj negativnoj pozadini generira više lažnih nego stvarnih pogodaka.
+                Trenira se i testira kronološki (60/20/20 po datumu, ne nasumično) da rezultati ne ispadnu umjetno dobri: trening
+                uči model, validacija (strogo nakon treninga, strogo prije testa) bira prag odluke koji maksimizira F1, test se
+                čita samo jednom, nakon što je prag već fiksiran. Najbolji model bira se po F1, ne po accuracy ni precisionu —
+                model koji nikad ne javi opasnost imao bi accuracy ~99% i precision 0. Nizak precision čak i kod najboljeg modela
+                je očekivan: stvarnih pozitivnih primjera ima jako malo, pa i mala stopa lažnih uzbuna na ogromnoj negativnoj
+                pozadini generira više lažnih nego stvarnih pogodaka. <b>AP</b> (Average Precision, površina ispod PR krivulje) je
+                zato realniji sažetak od ROC-AUC na ovako neuravnoteženom skupu. <b>Top-5 / Top-10 zona</b> je operativna mjera:
+                od svih stvarnih događaja u test razdoblju, koliki udio bi bio "uhvaćen" kad bi ophodnje/dronovi svaki
+                vremenski blok pokrivali samo 5, odnosno 10 najrizičnijih zona (umjesto svih) — to izravno pokazuje koliko
+                model pomaže kad je broj raspoloživih ophodnji/dronova ograničen.
             </div>
             <div class="db-card-subtitle" id="modelsSubtitle">Učitavanje...</div>
         </div>
@@ -93,9 +99,9 @@
         <div class="table-responsive mb-3">
             <table class="table table-sm table-striped" style="font-size:.82rem">
                 <thead><tr>
-                    <th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th><th>TP/FP/FN/TN</th>
+                    <th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th><th>AP</th><th>Prag</th><th>Top-5 / Top-10 zona</th><th>TP/FP/FN/TN</th>
                 </tr></thead>
-                <tbody id="modelsTable"><tr><td colspan="7" class="text-center py-3 text-muted">Učitavanje...</td></tr></tbody>
+                <tbody id="modelsTable"><tr><td colspan="10" class="text-center py-3 text-muted">Učitavanje...</td></tr></tbody>
             </table>
         </div>
         <div class="row">
@@ -396,11 +402,11 @@ async function loadModelComparison() {
         const d = await fetch('{{ route('ai.zoneModelMetrics') }}').then(r => r.json());
         if (!d.trained) {
             document.getElementById('modelsSubtitle').textContent = d.message || 'Nedovoljno podataka';
-            document.getElementById('modelsTable').innerHTML = `<tr><td colspan="7" class="text-center py-3 text-muted">${d.message || ''}</td></tr>`;
+            document.getElementById('modelsTable').innerHTML = `<tr><td colspan="10" class="text-center py-3 text-muted">${d.message || ''}</td></tr>`;
             return;
         }
         document.getElementById('modelsSubtitle').textContent =
-            `${d.n_rows.toLocaleString()} redaka (${d.n_positive} pozitivnih) · trening/test split na ${d.split_date} · najbolji: ${d.models[d.best_model]?.label ?? d.best_model}`;
+            `${d.n_rows.toLocaleString()} redaka (${d.n_positive} pozitivnih) · trening do ${d.val_date}, validacija do ${d.split_date} (prag se bira ovdje), test nakon toga · najbolji: ${d.models[d.best_model]?.label ?? d.best_model}`;
 
         const rows = Object.entries(d.models);
         document.getElementById('modelsTable').innerHTML = rows.map(([key, m]) => `
@@ -411,6 +417,11 @@ async function loadModelComparison() {
                 <td>${(m.recall * 100).toFixed(1)}%</td>
                 <td>${(m.f1 * 100).toFixed(1)}%</td>
                 <td>${m.roc_auc != null ? m.roc_auc.toFixed(3) : '—'}</td>
+                <td>${m.average_precision != null ? m.average_precision.toFixed(3) : '—'}</td>
+                <td><small>${m.threshold != null ? m.threshold.toFixed(3) : '—'}</small></td>
+                <td><small>${m.topk_coverage?.coverage_at_5 != null ? (m.topk_coverage.coverage_at_5 * 100).toFixed(0) + '%' : '—'} /
+                    ${m.topk_coverage?.coverage_at_10 != null ? (m.topk_coverage.coverage_at_10 * 100).toFixed(0) + '%' : '—'}
+                    <span class="text-muted">(${m.topk_coverage?.total_positive_events ?? 0} dog.)</span></small></td>
                 <td><small>${m.confusion_matrix.tp}/${m.confusion_matrix.fp}/${m.confusion_matrix.fn}/${m.confusion_matrix.tn}</small></td>
             </tr>`).join('');
 

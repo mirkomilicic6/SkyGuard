@@ -329,16 +329,48 @@ MODEL_SPECS = [
 ]
 
 
-# ── Phase 4: 4-model comparison, chronological split ───────────────────────────
+def topk_zone_coverage(dataset_slice: pd.DataFrame, y_proba, k_values=(5, 10)) -> dict:
+    """Operational readout, independent of any classification threshold:
+    across every (date, block) timeslot in `dataset_slice`, rank that
+    timeslot's zones by predicted probability and check whether each actual
+    positive ("a detection really happened here") falls inside the top-K.
+    This is the number that matters for dispatch — a border police unit can
+    only physically cover a handful of zones per shift, not all of them —
+    so it answers "if patrols/drones were sent to only the K highest-risk
+    zones every block, what share of real incidents would that have caught?"
+    """
+    d = dataset_slice[["date", "block", "label"]].copy()
+    d["proba"] = np.asarray(y_proba)
+    total_positive = int(d["label"].sum())
+    if total_positive == 0:
+        return {f"coverage_at_{k}": None for k in k_values} | {"total_positive_events": 0}
+
+    result = {"total_positive_events": total_positive}
+    for k in k_values:
+        def _covered(group):
+            top = group.sort_values("proba", ascending=False).head(k)
+            return top["label"].sum()
+        covered = d.groupby(["date", "block"], sort=False).apply(_covered, include_groups=False).sum()
+        result[f"coverage_at_{k}"] = round(float(covered) / total_positive, 3)
+    return result
+
+
+# ── Phase 4: 4-model comparison, chronological train/validation/test split ─────
 def compare_zone_models(dataset: pd.DataFrame) -> dict:
     if dataset.empty or dataset["label"].sum() < 5:
         return {"trained": False, "message": "Nedovoljno pozitivnih primjera za pouzdanu procjenu modela."}
 
     dataset = dataset.sort_values("date").reset_index(drop=True)
-    cutoff = int(len(dataset) * 0.8)
+    # 60/20/20 chronological split: train fits the model, validation (a
+    # period strictly between train and test) tunes the decision threshold,
+    # test is only ever read once per model, after tuning — never touched
+    # by it — for an honest final score.
+    train_cutoff = int(len(dataset) * 0.6)
+    val_cutoff = int(len(dataset) * 0.8)
     X, y = _feature_matrix(dataset)
-    X_train, X_test = X.iloc[:cutoff], X.iloc[cutoff:]
-    y_train, y_test = y.iloc[:cutoff], y.iloc[cutoff:]
+    X_train, X_val, X_test = X.iloc[:train_cutoff], X.iloc[train_cutoff:val_cutoff], X.iloc[val_cutoff:]
+    y_train, y_val, y_test = y.iloc[:train_cutoff], y.iloc[train_cutoff:val_cutoff], y.iloc[val_cutoff:]
+    test_slice = dataset.iloc[val_cutoff:]
 
     if y_train.nunique() < 2 or y_test.nunique() < 2:
         return {"trained": False, "message": "Kronološki test skup nema oba razreda — premalo podataka za pouzdanu procjenu."}
@@ -346,22 +378,29 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
     w_train = compute_sample_weight("balanced", y_train)
     scaler = StandardScaler().fit(X_train)
     X_train_scaled = pd.DataFrame(scaler.transform(X_train), columns=X_train.columns, index=X_train.index)
+    X_val_scaled = pd.DataFrame(scaler.transform(X_val), columns=X_val.columns, index=X_val.index)
     X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns, index=X_test.index)
 
     results = {}
     for key, label, needs_scaling, make_model in MODEL_SPECS:
         xtr = X_train_scaled if needs_scaling else X_train
+        xv = X_val_scaled if needs_scaling else X_val
         xte = X_test_scaled if needs_scaling else X_test
-        results[key] = {"label": label, **evaluate_model(make_model(), xtr, y_train, w_train, xte, y_test,
-                                                           feature_names=list(X.columns))}
+        metrics, y_proba_test, _ = evaluate_model(
+            make_model(), xtr, y_train, w_train, xte, y_test,
+            feature_names=list(X.columns), X_val=xv, y_val=y_val, return_artifacts=True,
+        )
+        metrics["topk_coverage"] = topk_zone_coverage(test_slice, y_proba_test)
+        results[key] = {"label": label, **metrics}
 
     best_key = max(results, key=lambda k: (results[k]["f1"], results[k]["roc_auc"] or 0))
 
     return {
         "trained": True,
         "n_rows": len(dataset), "n_positive": int(y.sum()),
-        "train_size": len(X_train), "test_size": len(X_test),
-        "split_date": dataset.iloc[cutoff]["date"] if cutoff < len(dataset) else dataset.iloc[-1]["date"],
+        "train_size": len(X_train), "val_size": len(X_val), "test_size": len(X_test),
+        "val_date": dataset.iloc[train_cutoff]["date"] if train_cutoff < len(dataset) else dataset.iloc[-1]["date"],
+        "split_date": dataset.iloc[val_cutoff]["date"] if val_cutoff < len(dataset) else dataset.iloc[-1]["date"],
         "models": results,
         "best_model": best_key,
     }
