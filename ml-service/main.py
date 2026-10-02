@@ -111,26 +111,90 @@ def get_detections(station_id: int | None = None, administration_id: int | None 
     return df.rename(columns={"detection_type": "type", "entity_count": "count"})
 
 
-def get_flight_points(station_id: int | None = None, administration_id: int | None = None) -> pd.DataFrame:
-    conn = pymysql.connect(**DB)
-    sql = """
-        SELECT g.flight_id, g.latitude, g.longitude
-        FROM gpx_points g
-        JOIN flights f ON f.id = g.flight_id
-        LEFT JOIN border_police_stations bps ON bps.id = f.station_id
-        WHERE g.latitude IS NOT NULL AND g.longitude IS NOT NULL
-    """
-    params = []
+def _scope_clause(station_id: int | None, administration_id: int | None) -> tuple[str, list]:
     if administration_id:
-        sql += " AND bps.police_administration_id = %s"
-        params = [administration_id]
-    elif station_id:
-        sql += " AND f.station_id = %s"
-        params = [station_id]
+        return " AND bps.police_administration_id = %s", [administration_id]
+    if station_id:
+        return " AND f.station_id = %s", [station_id]
+    return "", []
 
-    df = pd.read_sql(sql, conn, params=params or None)
-    conn.close()
-    return df
+
+def get_flight_zone_membership(zones: list, station_id: int | None = None, administration_id: int | None = None) -> pd.DataFrame:
+    """(zone, flight_id) pairs — a flight belongs to a zone if ANY of its GPX
+    points falls within that zone's radius. Computed one query per zone
+    directly in MySQL (distinct flight_ids only), rather than pulling every
+    one of potentially millions of raw GPX points into a pandas/numpy
+    distance computation: at this dataset's size (1.7M+ gpx_points) the
+    latter routinely exhausted the ml-service container's memory limit in
+    production.
+
+    Each query narrows by a lat/lon bounding box around the zone *before*
+    the precise SQRT distance check, so MySQL can use the (latitude,
+    longitude) index (see the add_lat_lon_index_to_gpx_points migration) for
+    an index range scan instead of a full table scan — with 37+ zones each
+    doing a 1.7M-row unindexed scan, the naive version of this query (plain
+    SQRT filter, no bounding box) took minutes end to end and was itself a
+    production regression, not just a memory one."""
+    if not zones:
+        return pd.DataFrame(columns=["zone", "flight_id"])
+
+    scope_sql, scope_params = _scope_clause(station_id, administration_id)
+    conn = pymysql.connect(**DB)
+    rows = []
+    try:
+        with conn.cursor() as cur:
+            for z in zones:
+                pad_lat = z["radius_km"] / 111.0
+                pad_lon = z["radius_km"] / (111.0 * max(np.cos(np.radians(z["lat"])), 0.2))
+                sql = """
+                    SELECT DISTINCT g.flight_id
+                    FROM gpx_points g
+                    JOIN flights f ON f.id = g.flight_id
+                    LEFT JOIN border_police_stations bps ON bps.id = f.station_id
+                    WHERE g.latitude BETWEEN %s AND %s
+                      AND g.longitude BETWEEN %s AND %s
+                      AND (SQRT(POW(g.latitude - %s, 2) + POW(g.longitude - %s, 2)) * 111.0) <= %s
+                """ + scope_sql
+                cur.execute(sql, [
+                    z["lat"] - pad_lat, z["lat"] + pad_lat,
+                    z["lon"] - pad_lon, z["lon"] + pad_lon,
+                    z["lat"], z["lon"], z["radius_km"], *scope_params,
+                ])
+                for (fid,) in cur.fetchall():
+                    rows.append((z["id"], fid))
+    finally:
+        conn.close()
+    return pd.DataFrame(rows, columns=["zone", "flight_id"]).drop_duplicates()
+
+
+def get_coverage_grid(bbox: tuple, lat_step: float, lon_step: float, shape: tuple,
+                       station_id: int | None = None, administration_id: int | None = None) -> np.ndarray:
+    """Histogram of GPX-point density per grid cell, computed as a MySQL
+    GROUP BY (so the result is one row per occupied cell — at most a few
+    hundred — instead of pulling every raw point into Python just to bin
+    it with numpy)."""
+    scope_sql, scope_params = _scope_clause(station_id, administration_id)
+    conn = pymysql.connect(**DB)
+    grid = np.zeros(shape)
+    try:
+        with conn.cursor() as cur:
+            sql = """
+                SELECT FLOOR((g.latitude - %s) / %s) AS lat_idx,
+                       FLOOR((g.longitude - %s) / %s) AS lon_idx,
+                       COUNT(*) AS c
+                FROM gpx_points g
+                JOIN flights f ON f.id = g.flight_id
+                LEFT JOIN border_police_stations bps ON bps.id = f.station_id
+                WHERE g.latitude IS NOT NULL AND g.longitude IS NOT NULL
+            """ + scope_sql + " GROUP BY lat_idx, lon_idx"
+            cur.execute(sql, [bbox[0], lat_step, bbox[2], lon_step, *scope_params])
+            for lat_idx, lon_idx, c in cur.fetchall():
+                li = int(np.clip(lat_idx, 0, shape[0] - 1))
+                lj = int(np.clip(lon_idx, 0, shape[1] - 1))
+                grid[li, lj] += c
+    finally:
+        conn.close()
+    return grid
 
 
 def get_flights_meta(station_id: int | None = None, administration_id: int | None = None) -> pd.DataFrame:
@@ -201,14 +265,14 @@ def _zone_pipeline_inputs(station_id: int = None, administration_id: int = None)
     (each row tagged with the exact zone DBSCAN assigned it — same "zone"
     column /clusters itself is built from, so counts never drift between
     that endpoint and this pipeline), DBSCAN zones, flight metadata and
-    GPX points."""
+    per-zone flight membership (computed in SQL — see get_flight_zone_membership)."""
     df = get_detections(station_id, administration_id)
     computed = zones_mod.compute_zones(df)
     df = df.reset_index(drop=True)
     df["zone"] = computed["point_zone_ids"]
     flights_meta = get_flights_meta(station_id, administration_id)
-    flight_points = get_flight_points(station_id, administration_id)
-    return df, computed["zones"], flights_meta, flight_points
+    flight_zone = get_flight_zone_membership(computed["zones"], station_id, administration_id)
+    return df, computed["zones"], flights_meta, flight_zone
 
 
 # ── Zone vs. GPX flight comparison ─────────────────────────────────────────────
@@ -218,10 +282,10 @@ def zones_flight_stats(station_id: int = None, administration_id: int = None):
     nadzora, i detekcija po satu leta — "koliko smo zapravo pazili na ovu
     zonu", ne samo broj detekcija. Koristi ga i sam dataset builder ispod, i
     RecommendationService::forDbscanZones() na Laravel strani."""
-    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    df, zones, flights_meta, flight_zone = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"zones": [], "message": "Nedovoljno detekcija za formiranje zona."}
-    stats = zones_mod.zone_flight_stats(zones, df, flights_meta, flight_points)
+    stats = zones_mod.zone_flight_stats(zones, df, flights_meta, flight_zone)
     return {"zones": stats}
 
 
@@ -232,10 +296,10 @@ def zones_dataset_preview(station_id: int = None, administration_id: int = None,
     stvarno gradi za nadzirano učenje (puna logika feature engineeringa je u
     zones.py) — ovo puni karticu "Izvorni podaci" na ML analiza stranici, da
     se vidi točno na čemu modeli iz koraka 3 uče."""
-    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    df, zones, flights_meta, flight_zone = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"rows": [], "n_rows": 0, "n_positive": 0, "message": "Nedovoljno detekcija za formiranje zona."}
-    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_points)
+    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_zone)
     if dataset.empty:
         return {"rows": [], "n_rows": 0, "n_positive": 0, "message": "Nedovoljno povijesnih podataka (treba >30 dana)."}
     preview = dataset.sample(min(rows, len(dataset)), random_state=42).sort_values("date")
@@ -256,10 +320,10 @@ def zone_model_metrics(station_id: int = None, administration_id: int = None):
     splitom (80/20 po datumu), i vraća metrike + koji je pobjednik po F1.
     Ovo je najskuplja operacija u cijelom servisu (~30-45s), zato se rezultat
     kešira po obliku skupa (compare_zone_models_cached)."""
-    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    df, zones, flights_meta, flight_zone = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"trained": False, "message": "Nedovoljno detekcija za formiranje zona."}
-    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_points)
+    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_zone)
     return zones_mod.compare_zone_models_cached(dataset)
 
 
@@ -271,10 +335,10 @@ def zone_predictions(station_id: int = None, administration_id: int = None,
     'sada' ako se ne pošalje), koristeći bilo koji model koji /zone-model-metrics
     proglasi pobjednikom (ili eksplicitno traženi `model`). Ovo puni "Prediktivnu
     kartu" (korak 4) na ML analiza stranici."""
-    df, zones, flights_meta, flight_points = _zone_pipeline_inputs(station_id, administration_id)
+    df, zones, flights_meta, flight_zone = _zone_pipeline_inputs(station_id, administration_id)
     if not zones:
         return {"zones": [], "message": "Nedovoljno detekcija za formiranje zona."}
-    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_points)
+    dataset = zones_mod.build_zone_timeline_dataset(zones, df, flights_meta, flight_zone)
     if dataset.empty:
         return {"zones": [], "message": "Nedovoljno povijesnih podataka (treba >30 dana)."}
 
@@ -285,7 +349,7 @@ def zone_predictions(station_id: int = None, administration_id: int = None,
         comparison = zones_mod.compare_zone_models_cached(dataset)
         model = comparison.get("best_model") or "gradient_boosting"
 
-    flight_stats = zones_mod.zone_flight_stats(zones, df, flights_meta, flight_points)
+    flight_stats = zones_mod.zone_flight_stats(zones, df, flights_meta, flight_zone)
     predictions = zones_mod.predict_zone_probabilities(dataset, zones, flight_stats, model, dow, block)
     return {"zones": predictions, "model": model}
 
@@ -683,20 +747,6 @@ def _train_presence_model(df: pd.DataFrame, bbox: tuple) -> RandomForestClassifi
     return model
 
 
-def _bin_counts_to_grid(lat_arr, lon_arr, bbox, lat_step, lon_step, shape) -> np.ndarray:
-    """Count how many (lat, lon) points fall into each cell of a lat/lon grid
-    of the given shape — the raw-count building block behind both the
-    risk-grid's flight-coverage heuristic and the bandit's pull/success
-    counts."""
-    counts = np.zeros(shape)
-    if lat_arr.size == 0:
-        return counts
-    lat_idx = np.clip(((lat_arr - bbox[0]) / lat_step).astype(int), 0, shape[0] - 1)
-    lon_idx = np.clip(((lon_arr - bbox[2]) / lon_step).astype(int), 0, shape[1] - 1)
-    np.add.at(counts, (lat_idx, lon_idx), 1)
-    return counts
-
-
 def _build_grid(df: pd.DataFrame, cell_km: float = None, corridor_km: float = 20.0, divisor: float = 22.0):
     """
     Shared grid geometry for anything that scores a spatial grid over the
@@ -796,11 +846,7 @@ def risk_grid(station_id: int = None, administration_id: int = None,
     risk = risk / max(risk.max(), 1e-9) * 100
 
     # Coverage: how much drone-flight history each cell already has
-    flights_df = get_flight_points(station_id, administration_id)
-    coverage_grid = _bin_counts_to_grid(
-        flights_df["latitude"].astype(float).to_numpy(), flights_df["longitude"].astype(float).to_numpy(),
-        bbox, lat_step, lon_step, (len(lats), len(lons)),
-    )
+    coverage_grid = get_coverage_grid(bbox, lat_step, lon_step, (len(lats), len(lons)), station_id, administration_id)
     cov_log = np.log1p(coverage_grid)
     if cov_log.max() > 0:
         coverage_grid = cov_log / cov_log.max() * 100

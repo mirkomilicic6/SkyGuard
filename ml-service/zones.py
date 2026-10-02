@@ -108,27 +108,9 @@ def compute_zones(df: pd.DataFrame, eps_km: float = 2.0, min_samples: int = 3) -
     return {"zones": zones, "noise": noise_pts, "total_detections": len(df), "point_zone_ids": point_zone_ids}
 
 
-def _flight_zone_membership(zones: list, flight_points: pd.DataFrame) -> pd.DataFrame:
-    """(zone, flight_id) pairs — a flight belongs to a zone if ANY of its
-    GPX points falls within that zone's radius (whole-flight attribution,
-    the same simplification RecommendationService already uses for
-    station-level zones rather than pro-rating partial time-in-zone)."""
-    rows = []
-    if flight_points.empty:
-        return pd.DataFrame(rows, columns=["zone", "flight_id"])
-    lat = flight_points["latitude"].astype(float).to_numpy()
-    lon = flight_points["longitude"].astype(float).to_numpy()
-    fids = flight_points["flight_id"].to_numpy()
-    for z in zones:
-        d = np.sqrt((lat - z["lat"]) ** 2 + (lon - z["lon"]) ** 2) * 111.0
-        for fid in np.unique(fids[d <= z["radius_km"]]):
-            rows.append((z["id"], fid))
-    return pd.DataFrame(rows, columns=["zone", "flight_id"]).drop_duplicates()
-
-
 # ── Phase 2: zone vs. GPX flights ──────────────────────────────────────────────
 def zone_flight_stats(zones: list, detections_df: pd.DataFrame, flights_meta: pd.DataFrame,
-                       flight_points: pd.DataFrame, recent_days: int = 30) -> list:
+                       flight_zone: pd.DataFrame, recent_days: int = 30) -> list:
     """Per zone: flights through it, surveillance hours, detections found,
     the key detections-per-hour rate, activity timing, and a 30d/prev-30d
     trend — the same shape of metric RecommendationService already computes
@@ -137,13 +119,16 @@ def zone_flight_stats(zones: list, detections_df: pd.DataFrame, flights_meta: pd
     `detections_df` must already carry the exact per-row "zone" column that
     `compute_zones()`'s `point_zone_ids` produced (see `_zone_pipeline_inputs`
     in main.py) — detections have no other correct zone assignment, since
-    DBSCAN was run directly on them."""
+    DBSCAN was run directly on them. `flight_zone` is the (zone, flight_id)
+    membership table computed in SQL by main.py's get_flight_zone_membership
+    — pulling every raw GPX point into pandas to compute this in Python
+    routinely exhausted ml-service's memory limit once the dataset reached
+    the low millions of points."""
     if not zones:
         return []
 
     det = detections_df.copy()
 
-    flight_zone = _flight_zone_membership(zones, flight_points)
     fm = flights_meta.copy()
     fm["flight_date"] = pd.to_datetime(fm["flight_date"])
     fzm = flight_zone.merge(fm, left_on="flight_id", right_on="id", how="left")
@@ -193,7 +178,7 @@ def zone_flight_stats(zones: list, detections_df: pd.DataFrame, flights_meta: pd
 
 # ── Phase 3: supervised (zone, day, block) dataset ─────────────────────────────
 def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
-                                 flights_meta: pd.DataFrame, flight_points: pd.DataFrame) -> pd.DataFrame:
+                                 flights_meta: pd.DataFrame, flight_zone: pd.DataFrame) -> pd.DataFrame:
     """One row per (zone, day, time-block) across the full data history.
     Every feature is a cumulative/rolling stat *shifted back one day* so
     nothing about the outcome being predicted leaks into its own features.
@@ -203,7 +188,9 @@ def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
 
     `detections_df` must already carry the exact per-row "zone" column
     from `compute_zones()`'s `point_zone_ids` (see `_zone_pipeline_inputs`
-    in main.py) — same reasoning as `zone_flight_stats()` above."""
+    in main.py) — same reasoning as `zone_flight_stats()` above. `flight_zone`
+    is the (zone, flight_id) membership table computed in SQL — see the note
+    on `zone_flight_stats()` above for why that matters at this data volume."""
     if not zones:
         return pd.DataFrame()
 
@@ -213,7 +200,6 @@ def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
     det["date"] = det["detected_at"].dt.normalize()
     det["block"] = det["hour"].astype(int).map(_block_for_hour)
 
-    flight_zone = _flight_zone_membership(zones, flight_points)
     fm = flights_meta.copy()
     fm["flight_date"] = pd.to_datetime(fm["flight_date"])
     fm["date"] = fm["flight_date"].dt.normalize()
