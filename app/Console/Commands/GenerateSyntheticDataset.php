@@ -10,7 +10,6 @@ use App\Models\HuntingCamera;
 use App\Models\PoliceAdministration;
 use App\Models\User;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 /**
@@ -40,6 +39,7 @@ class GenerateSyntheticDataset extends Command
         {--flights=250 : Target number of flights to generate}
         {--detections=1500 : Target number of detections to generate}
         {--months=12 : Length of the generation window, in months, ending now}
+        {--active-pct=50 : % chance a given flight carries any detection at all}
         {--no-wipe : Do not truncate existing flights/gpx_points/detections first}';
 
     protected $description = 'Replace flights/gpx_points/detections with a designed synthetic dataset (border-anchored flights, 3 detection sources, hotspot + episodic patterns)';
@@ -100,14 +100,13 @@ class GenerateSyntheticDataset extends Command
         $targetFlights = (int) $this->option('flights');
         $targetDetections = (int) $this->option('detections');
 
-        $flightRows = $this->generateFlights($targetFlights);
-        $this->info('Letovi generirani: ' . count($flightRows));
-
         $droneTarget = (int) round($targetDetections * 0.40);
         $cameraTarget = (int) round($targetDetections * 0.35);
         $groundTarget = $targetDetections - $droneTarget - $cameraTarget;
 
-        $droneCount = $this->generateDroneDetections($flightRows, $droneTarget);
+        $activePct = (int) $this->option('active-pct');
+        [$flightsGenerated, $droneCount, $flightsWithDetections] = $this->generateFlightsAndDrone($targetFlights, $droneTarget, $activePct);
+        $this->info('Letovi generirani: ' . $flightsGenerated);
         $this->info("Dron-detekcije: {$droneCount} (cilj {$droneTarget})");
 
         $cameraCount = $this->generateCameraDetections($cameraTarget);
@@ -116,11 +115,10 @@ class GenerateSyntheticDataset extends Command
         $groundCount = $this->generateGroundDetections($groundTarget);
         $this->info("Ophodnja/ručni unos: {$groundCount} (cilj {$groundTarget})");
 
-        $flightsWithDetections = DB::table('detections')->whereNotNull('flight_id')->distinct('flight_id')->count('flight_id');
         $this->info('');
         $this->info('--- Sažetak ---');
         $this->info('Ukupno letova: ' . Flight::count() . " (od čega s detekcijama: {$flightsWithDetections}, " .
-            round(100 * $flightsWithDetections / max(1, count($flightRows))) . '%)');
+            round(100 * $flightsWithDetections / max(1, $flightsGenerated)) . '%)');
         $this->info('Ukupno detekcija: ' . Detection::count());
         $this->info('Period: ' . $this->from->format('Y-m-d') . ' – ' . $this->to->format('Y-m-d'));
 
@@ -345,22 +343,37 @@ class GenerateSyntheticDataset extends Command
         return $candidate?->id;
     }
 
-    /** @return array<int, array{flight: Flight, points: array, wantsDetections: bool, episode: ?string}> */
-    private function generateFlights(int $target): array
+    /**
+     * Generates every flight AND its drone detections in one streaming pass:
+     * a flight's GPX points are built, inserted, used to sample that same
+     * flight's drone detections, then discarded before moving to the next
+     * flight. At low hundreds of flights it was fine to hold the whole
+     * dataset (points included) in memory for a second pass — at tens of
+     * thousands of flights that blew PHP's memory limit with no useful
+     * error (a hard OOM kill, not a catchable exception). Exact per-flight
+     * drone-detection counts still hit the target precisely: a cheap first
+     * pass decides station/time/anchor/wants-detections for every flight
+     * (lightweight scalars only, no points), scales those into an exact
+     * largest-remainder count per flight, and the second (streaming) pass
+     * just realises that plan.
+     *
+     * @return array{0: int, 1: int, 2: int} [flightsGenerated, droneDetectionsGenerated, flightsWithDetections]
+     */
+    private function generateFlightsAndDrone(int $targetFlights, int $targetDroneDetections, int $activePct = 50): array
     {
         $piloted = array_filter($this->stationCtx, fn ($ctx) => $ctx['pilot'] !== null && $ctx['drones']->isNotEmpty());
         if (empty($piloted)) {
             $this->warn('Nema postaja s pilotom i dronom — nema letova.');
-            return [];
+            return [0, 0, 0];
         }
 
-        $floor = max(1, min(3, intdiv($target, max(1, count($piloted)))));
+        $floor = max(1, min(3, intdiv($targetFlights, max(1, count($piloted)))));
         $weights = array_map(fn ($ctx) => $ctx['activityWeight'] * (mt_rand(80, 130) / 100), $piloted);
         $totalWeight = array_sum($weights);
         $counts = [];
         $assigned = 0;
         foreach ($weights as $stationId => $w) {
-            $counts[$stationId] = max($floor, (int) round($target * $w / $totalWeight));
+            $counts[$stationId] = max($floor, (int) round($targetFlights * $w / $totalWeight));
             $assigned += $counts[$stationId];
         }
         // Largest-remainder-ish trim/pad to land close to target, bounded so a
@@ -368,54 +381,125 @@ class GenerateSyntheticDataset extends Command
         $stationIds = array_keys($counts);
         $guard = 0;
         $maxGuard = count($stationIds) * 1000 + 1000;
-        while ($assigned > $target && $guard++ < $maxGuard) {
+        while ($assigned > $targetFlights && $guard++ < $maxGuard) {
             $sid = $stationIds[array_rand($stationIds)];
             if ($counts[$sid] > $floor) { $counts[$sid]--; $assigned--; }
         }
         $guard = 0;
-        while ($assigned < $target && $guard++ < $maxGuard) {
+        while ($assigned < $targetFlights && $guard++ < $maxGuard) {
             $sid = $stationIds[array_rand($stationIds)];
             $counts[$sid]++; $assigned++;
         }
 
-        $purposes = ['Redovna granična patrola', 'Nadzor graničnog pojasa', 'Preventivna kontrola prijelaza', 'Praćenje kretanja uz granicu'];
-        $rows = [];
-        $gpxBuffer = [];
-
+        // Pass 1 — lightweight plan per flight (scalars only, no GPX points).
+        $plans = [];
         foreach ($counts as $stationId => $count) {
             $ctx = $this->stationCtx[$stationId];
             for ($i = 0; $i < $count; $i++) {
                 $dayOffset = $this->sampleDayOffset($ctx);
                 $episodeType = $ctx['dayWeights'][$dayOffset]['episode'];
                 $hour = $this->sampleHour($episodeType, 0.35); // flights skew less to pure night than passive sensors
-                $minute = mt_rand(0, 59);
-
-                $flightDate = $this->from->modify("+{$dayOffset} days")->setTime($hour, $minute, mt_rand(0, 59));
-                $durationMinutes = mt_rand(15, 45);
-
                 $mode = null;
                 [$anchorLat, $anchorLon] = $this->anchorPoint($ctx, $dayOffset, $mode);
 
-                [$flight, $points, $distanceKm, $maxAlt, $avgSpeed] = $this->buildFlight(
-                    $ctx, $flightDate, $durationMinutes, $anchorLat, $anchorLon, $purposes
-                );
-                $flight->save();
-
-                foreach ($points as &$p) { $p['flight_id'] = $flight->id; }
-                unset($p);
-                GpxPoint::insert($points);
-
-                $rows[] = [
-                    'flight' => $flight,
-                    'points' => $points,
-                    'wantsDetections' => mt_rand(1, 100) <= 50,
-                    'episode' => $episodeType,
+                $plans[] = [
                     'stationId' => $stationId,
+                    'dayOffset' => $dayOffset,
+                    'hour' => $hour, 'minute' => mt_rand(0, 59), 'second' => mt_rand(0, 59),
+                    'durationMinutes' => mt_rand(15, 45),
+                    'anchorLat' => $anchorLat, 'anchorLon' => $anchorLon,
+                    'episode' => $episodeType,
+                    'wantsDetections' => mt_rand(1, 100) <= $activePct,
                 ];
             }
         }
 
-        return $rows;
+        // Exact per-flight drone-detection count via largest-remainder scaling
+        // (cheap — just scalars — computed before any points exist).
+        $eligiblePlanIdx = [];
+        $raw = [];
+        foreach ($plans as $idx => $p) {
+            if ($p['wantsDetections']) {
+                $base = mt_rand(1, 4);
+                if ($p['episode'] !== null) { $base += mt_rand(1, 4); }
+                $eligiblePlanIdx[] = $idx;
+                $raw[] = $base;
+            }
+        }
+        $scaled = $this->scaleToTarget($raw, $targetDroneDetections);
+        $droneCountByPlan = array_fill(0, count($plans), 0);
+        foreach ($eligiblePlanIdx as $j => $planIdx) {
+            $droneCountByPlan[$planIdx] = $scaled[$j];
+        }
+
+        // Pass 2 — stream: build + insert each flight, its GPX points and its
+        // drone detections, then discard the points before the next flight.
+        $purposes = ['Redovna granična patrola', 'Nadzor graničnog pojasa', 'Preventivna kontrola prijelaza', 'Praćenje kretanja uz granicu'];
+        $types = ['vehicle' => 35, 'group' => 30, 'person' => 25, 'other' => 10];
+
+        $flightsGenerated = 0;
+        $droneDetectionsGenerated = 0;
+        $flightsWithDetections = 0;
+        $gpxBuffer = [];
+        $detBuffer = [];
+        $sinceFlush = 0;
+        $flushEveryFlights = 20;
+
+        foreach ($plans as $idx => $p) {
+            $ctx = $this->stationCtx[$p['stationId']];
+            $flightDate = $this->from->modify("+{$p['dayOffset']} days")->setTime($p['hour'], $p['minute'], $p['second']);
+
+            [$flight, $points] = $this->buildFlight(
+                $ctx, $flightDate, $p['durationMinutes'], $p['anchorLat'], $p['anchorLon'], $purposes
+            );
+            $flight->save();
+            $flightsGenerated++;
+
+            foreach ($points as &$pt) { $pt['flight_id'] = $flight->id; }
+            unset($pt);
+            foreach ($points as $pt) { $gpxBuffer[] = $pt; }
+
+            $n = $droneCountByPlan[$idx];
+            if ($n > 0) {
+                $flightsWithDetections++;
+                for ($k = 0; $k < $n; $k++) {
+                    $pp = $points[array_rand($points)];
+                    $bearing = mt_rand() / mt_getrandmax() * 2 * M_PI;
+                    $jitterKm = mt_rand(5, 20) / 100; // 50-200m off the flight path
+                    $lat = (float) $pp['latitude'] + (sin($bearing) * $jitterKm) / 111.0;
+                    $lon = (float) $pp['longitude'] + (cos($bearing) * $jitterKm) / (111.0 * cos(deg2rad((float) $pp['latitude'])));
+                    $type = $this->weightedPick($types);
+
+                    $detBuffer[] = [
+                        'flight_id' => $flight->id,
+                        'station_id' => $ctx['station']->id,
+                        'created_by' => $flight->user_id,
+                        'source' => 'drone',
+                        'latitude' => round($lat, 7),
+                        'longitude' => round($lon, 7),
+                        'detection_type' => $type,
+                        'entity_count' => $this->entityCountFor($type),
+                        'note' => null,
+                        'detected_at' => $pp['timestamp'],
+                        'created_at' => now(), 'updated_at' => now(),
+                    ];
+                    $droneDetectionsGenerated++;
+                }
+            }
+            unset($points, $pp);
+
+            if (++$sinceFlush >= $flushEveryFlights) {
+                foreach (array_chunk($gpxBuffer, 1000) as $chunk) { GpxPoint::insert($chunk); }
+                foreach (array_chunk($detBuffer, 500) as $chunk) { Detection::insert($chunk); }
+                $gpxBuffer = [];
+                $detBuffer = [];
+                $sinceFlush = 0;
+            }
+        }
+        foreach (array_chunk($gpxBuffer, 1000) as $chunk) { GpxPoint::insert($chunk); }
+        foreach (array_chunk($detBuffer, 500) as $chunk) { Detection::insert($chunk); }
+
+        return [$flightsGenerated, $droneDetectionsGenerated, $flightsWithDetections];
     }
 
     private function buildFlight(array $ctx, \DateTimeImmutable $flightDate, int $durationMinutes, float $centerLat, float $centerLon, array $purposes): array
@@ -485,69 +569,6 @@ class GenerateSyntheticDataset extends Command
         ]);
 
         return [$flight, $points, $totalDistanceKm, $maxAltitude, $avgSpeed];
-    }
-
-    private function generateDroneDetections(array $flightRows, int $target): int
-    {
-        $eligible = array_values(array_filter($flightRows, fn ($r) => $r['wantsDetections']));
-        if (empty($eligible)) {
-            return 0;
-        }
-
-        // Variable, not-fixed per-flight count: weighted base + episode boost,
-        // then largest-remainder scaled to hit the target sum.
-        $raw = [];
-        foreach ($eligible as $r) {
-            $base = mt_rand(1, 4);
-            if ($r['episode'] !== null) {
-                $base += mt_rand(1, 4);
-            }
-            $raw[] = $base;
-        }
-        $counts = $this->scaleToTarget($raw, $target);
-
-        $types = ['vehicle' => 35, 'group' => 30, 'person' => 25, 'other' => 10];
-        $inserted = 0;
-        $rows = [];
-
-        foreach ($eligible as $idx => $r) {
-            $n = $counts[$idx];
-            if ($n <= 0) { continue; }
-            $flight = $r['flight'];
-            $points = $r['points'];
-            $ctx = $this->stationCtx[$r['stationId']];
-            $createdBy = $flight->user_id;
-
-            for ($k = 0; $k < $n; $k++) {
-                $p = $points[array_rand($points)];
-                $bearing = mt_rand() / mt_getrandmax() * 2 * M_PI;
-                $jitterKm = mt_rand(5, 20) / 100; // 50-200m off the flight path
-                $lat = (float) $p['latitude'] + (sin($bearing) * $jitterKm) / 111.0;
-                $lon = (float) $p['longitude'] + (cos($bearing) * $jitterKm) / (111.0 * cos(deg2rad((float) $p['latitude'])));
-                $type = $this->weightedPick($types);
-
-                $rows[] = [
-                    'flight_id' => $flight->id,
-                    'station_id' => $ctx['station']->id,
-                    'created_by' => $createdBy,
-                    'source' => 'drone',
-                    'latitude' => round($lat, 7),
-                    'longitude' => round($lon, 7),
-                    'detection_type' => $type,
-                    'entity_count' => $this->entityCountFor($type),
-                    'note' => null,
-                    'detected_at' => $p['timestamp'],
-                    'created_at' => now(), 'updated_at' => now(),
-                ];
-                $inserted++;
-            }
-        }
-
-        foreach (array_chunk($rows, 500) as $chunk) {
-            Detection::insert($chunk);
-        }
-
-        return $inserted;
     }
 
     private function generateCameraDetections(int $target): int

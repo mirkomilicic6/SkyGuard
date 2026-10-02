@@ -200,14 +200,25 @@ class DashboardController extends Controller
         ])->values();
 
         // Routes: date/station-scoped only — type/source are detection-level
-        // attributes and don't apply to a whole flight.
-        $routes = Flight::query()
+        // attributes and don't apply to a whole flight. Capped and limited to
+        // the most recent matches: with tens of thousands of flights now in
+        // the dataset, eager-loading every GPX point for every match blew
+        // past the 512M web request memory limit (and would have been an
+        // unreadable mess of overlapping polylines on the map regardless).
+        $routesQuery = Flight::query()
             ->when($stationId, fn($q) => $q->where('station_id', $stationId))
             ->when(!$stationId && $administrationId, fn($q) =>
                 $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
             )
             ->when($request->filled('date_from'), fn($q) => $q->whereDate('flight_date', '>=', $request->date('date_from')))
-            ->when($request->filled('date_to'), fn($q) => $q->whereDate('flight_date', '<=', $request->date('date_to')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('flight_date', '<=', $request->date('date_to')));
+
+        $routesTotal = (clone $routesQuery)->count();
+        $routesLimit = 500;
+
+        $routes = $routesQuery
+            ->orderByDesc('flight_date')
+            ->limit($routesLimit)
             ->with(['gpxPoints' => fn($q) => $q->orderBy('point_order')->select('id', 'flight_id', 'latitude', 'longitude')])
             ->get()
             ->map(fn($f) => $f->gpxPoints->map(fn($p) => [(float) $p->latitude, (float) $p->longitude])->values())
@@ -258,6 +269,8 @@ class DashboardController extends Controller
         return response()->json([
             'points'          => $points,
             'routes'          => $routes,
+            'routes_total'    => $routesTotal,
+            'routes_shown'    => $routes->count(),
             'cameras'         => $cameras,
             'stations'        => $stations,
             'administrations' => $administrationAreas,

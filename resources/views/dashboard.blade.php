@@ -820,8 +820,11 @@ function ovmRenderAll() {
     ovmRenderStations();
     ovmRenderAdmins();
     ovmSyncVisibility();
+    const routesNote = (ovmData.routes_total ?? ovmData.routes.length) > ovmData.routes.length
+        ? ` (prikazano ${ovmData.routes_shown} od ${ovmData.routes_total} najnovijih)`
+        : '';
     document.getElementById('ovmFilteredCount').textContent =
-        `${ovmData.points.length} detekcija · ${ovmData.routes.length} letova · ${ovmData.cameras.length} kamera · ${ovmData.stations.length} postaja`;
+        `${ovmData.points.length} detekcija · ${ovmData.routes.length} letova${routesNote} · ${ovmData.cameras.length} kamera · ${ovmData.stations.length} postaja`;
 }
 
 function ovmBuildQuery() {
