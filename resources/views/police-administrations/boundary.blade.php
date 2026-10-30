@@ -103,7 +103,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
 }).addTo(map);
 
-// This administration's own stations — shown as grey reference context.
+// postaje ove uprave, sivo, kao orijentir
 const TERRITORY_RADIUS_M = {{ \App\Models\BorderPoliceStation::TERRITORY_RADIUS_KM * 1000 }};
 const stationLayers = [];
 stationPoints.forEach(st => {
@@ -114,16 +114,14 @@ stationPoints.forEach(st => {
     stationLayers.push(layer);
 });
 
-// Neighbouring administrations' boundaries — read-only reference
+// granice susjednih uprava, samo za prikaz
 neighborBoundaries.forEach(n => {
     L.polygon(n.boundary, { color: '#9ca3af', weight: 2, dashArray: '10,6', fillOpacity: 0.02, interactive: false })
         .bindTooltip(n.name, { permanent: true, direction: 'center', className: 'admin-boundary-label' })
         .addTo(map);
 });
 
-// Editable layer — this administration's own boundary, drawn distinctly
-// (magenta, thick dashed line) so it's visually not confused with a
-// station's boundary (solid gold).
+// granica ove uprave koja se uređuje, ljubičasta isprekidana linija da se razlikuje od granica postaja
 const drawnItems = new L.FeatureGroup();
 map.addLayer(drawnItems);
 

@@ -111,7 +111,7 @@ function populateStations(adminId, preselect) {
 
 adminSelect.addEventListener('change', () => populateStations(adminSelect.value, null));
 
-// Pre-populate on page load
+// popunjavanje pri učitavanju stranice
 if (adminSelect.value) {
     populateStations(adminSelect.value, selectedStation);
 }

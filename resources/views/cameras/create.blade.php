@@ -98,7 +98,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 let marker = null;
 
-// ── Station territory — drawn boundary polygon if one exists, else a 10km circle ──
+// Područje postaje: ucrtana granica, a ako je nema, krug od 10 km
 const TERRITORY_RADIUS_M = {{ \App\Models\BorderPoliceStation::TERRITORY_RADIUS_KM * 1000 }};
 let territoryLayer = null;
 

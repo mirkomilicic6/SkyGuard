@@ -8,10 +8,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('border_police_stations', function (Blueprint $table) {
-            // Hand-drawn polygon (array of [lat, lon] pairs) marking the station's
-            // actual territory. Null until an admin/viewer for that station draws
-            // one on the map — camera placement falls back to the 10km radius
-            // circle until then.
+            // ucrtana granica postaje (popis točaka [lat, lon]);
+            // dok nije ucrtana, koristi se krug od 10 km oko postaje
             $table->json('boundary')->nullable()->after('longitude');
         });
     }

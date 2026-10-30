@@ -2,14 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BorderPoliceStation;
+use App\Services\RecommendationService;
 use Anthropic\Client;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
-    private string $mlBase = 'http://127.0.0.1:8001';
+    private string $mlBase;
+
+    public function __construct()
+    {
+        $this->mlBase = config('services.ml.url');
+    }
+
+    // Asistent na zasebnoj stranici (isti /chat, veći prikaz)
+    public function page()
+    {
+        return view('ai.assistant');
+    }
 
     public function respond(Request $request)
     {
@@ -19,8 +33,19 @@ class ChatController extends Controller
         ]);
 
         $user = auth()->user();
-        $stationId = $user->station_id;
-        $adminId = $stationId ? $user->station?->administration?->id : null;
+
+        // opseg podataka kao u ostatku aplikacije: administrator vidi upravu,
+        // analitičar i pilot svoju postaju, glavni administrator sve
+        $stationId = null;
+        $adminId   = null;
+
+        if ($user->station_id !== null) {
+            if ($user->hasRole('admin')) {
+                $adminId = $user->station?->police_administration_id;
+            } else {
+                $stationId = $user->station_id;
+            }
+        }
 
         $messages = $request->input('history', []);
         $messages[] = ['role' => 'user', 'content' => $request->input('message')];
@@ -39,7 +64,7 @@ class ChatController extends Controller
                 $response = $client->messages->create(
                     model: 'claude-opus-4-8',
                     maxTokens: 1536,
-                    system: $this->systemPrompt(),
+                    system: $this->systemPrompt($user),
                     messages: $messages,
                     tools: $tools,
                 );
@@ -60,6 +85,8 @@ class ChatController extends Controller
                     ->implode("\n");
 
                 $messages[] = ['role' => 'assistant', 'content' => $text];
+
+                $this->addOwnStationMarker($mapPoints, $user);
 
                 return response()->json([
                     'reply' => $text,
@@ -84,6 +111,8 @@ class ChatController extends Controller
             $messages[] = ['role' => 'user', 'content' => $toolResults];
         }
 
+        $this->addOwnStationMarker($mapPoints, $user);
+
         return response()->json([
             'reply' => 'Nisam uspio doći do odgovora u razumnom broju koraka. Pokušajte preformulirati pitanje.',
             'history' => $messages,
@@ -91,11 +120,28 @@ class ChatController extends Controller
         ]);
     }
 
-    /**
-     * Pull lat/lon-bearing recommendations out of a tool result so the widget
-     * can plot them on a mini map instead of the pilot having to eyeball
-     * coordinates in the chat text.
-     */
+    // Ako odgovor ima točke za kartu, dodaje se i postaja korisnika kao orijentir.
+    // Glavni administrator nema postaju, pa se tada ne dodaje.
+    private function addOwnStationMarker(array &$points, $user): void
+    {
+        if (empty($points) || $user->station_id === null) {
+            return;
+        }
+
+        $station = $user->station;
+        if (!$station || $station->latitude === null || $station->longitude === null) {
+            return;
+        }
+
+        array_unshift($points, [
+            'lat'   => (float) $station->latitude,
+            'lon'   => (float) $station->longitude,
+            'kind'  => 'station',
+            'value' => $station->name,
+        ]);
+    }
+
+    // Izdvaja žarišta s koordinatama iz rezultata alata za malu kartu u razgovoru
     private function collectMapPoints(string $name, array $input, mixed $result, array &$points): void
     {
         if (!is_array($result)) {
@@ -103,56 +149,69 @@ class ChatController extends Controller
         }
 
         match ($name) {
-            'get_risk_grid' => $this->addGridPoints($result, $points),
-            'get_clusters' => $this->addClusterPoints($result, $points),
-            'predict_location_risk' => $this->addPredictionPoint($input, $result, $points),
+            'get_zone_risk' => $this->addZoneRiskPoints($result, $points),
+            'get_zones' => $this->addZonePoints($result, $points),
             default => null,
         };
     }
 
-    private function addGridPoints(array $data, array &$points): void
-    {
-        foreach ($data['recommend_increase'] ?? [] as $c) {
-            if (isset($c['lat'], $c['lon'])) {
-                $points[] = ['lat' => (float) $c['lat'], 'lon' => (float) $c['lon'], 'kind' => 'increase', 'value' => $c['risk'] ?? null];
-            }
-        }
-        foreach ($data['recommend_decrease'] ?? [] as $c) {
-            if (isset($c['lat'], $c['lon'])) {
-                $points[] = ['lat' => (float) $c['lat'], 'lon' => (float) $c['lon'], 'kind' => 'decrease', 'value' => $c['risk'] ?? null];
-            }
-        }
-    }
+    // Vrsta preporuke i oznaka na karti
+    private const ZONE_RISK_KIND = [
+        'increase' => 'increase',
+        'maintain' => 'maintain',
+        'consider_reduction' => 'decrease',
+        'insufficient_data' => 'insufficient',
+    ];
 
-    private function addClusterPoints(array $data, array &$points): void
+    private function addZoneRiskPoints(array $data, array &$points): void
     {
-        foreach ($data['clusters'] ?? [] as $cl) {
-            if (isset($cl['lat'], $cl['lon'])) {
-                $points[] = ['lat' => (float) $cl['lat'], 'lon' => (float) $cl['lon'], 'kind' => 'cluster', 'value' => $cl['risk'] ?? null];
+        foreach ($data['zones'] ?? [] as $z) {
+            $kind = self::ZONE_RISK_KIND[$z['recommendation'] ?? ''] ?? null;
+            if ($kind && isset($z['lat'], $z['lon'])) {
+                $points[] = ['lat' => (float) $z['lat'], 'lon' => (float) $z['lon'], 'kind' => $kind,
+                    'value' => $z['id'] . ($z['risk_index'] !== null ? " · indeks rizika {$z['risk_index']}" : ''), 'near' => $z['near'] ?? null];
             }
         }
     }
 
-    private function addPredictionPoint(array $input, mixed $result, array &$points): void
+    private function addZonePoints(array $data, array &$points): void
     {
-        if (isset($input['lat'], $input['lon'])) {
-            $points[] = [
-                'lat' => (float) $input['lat'],
-                'lon' => (float) $input['lon'],
-                'kind' => 'prediction',
-                'value' => is_array($result) ? ($result['risk'] ?? null) : null,
-            ];
+        foreach ($data['zones'] ?? [] as $z) {
+            if (isset($z['lat'], $z['lon'])) {
+                $points[] = ['lat' => (float) $z['lat'], 'lon' => (float) $z['lon'], 'kind' => 'cluster',
+                    'value' => $z['id'] . ' · ' . ($z['detections_count'] ?? 0) . ' det.', 'near' => $z['near'] ?? null];
+            }
         }
     }
 
-    private function systemPrompt(): string
+    private function systemPrompt($user): string
     {
+        $stationContext = 'Korisnik je super admin i vidi podatke sa svih postaja.';
+        if ($user->station_id !== null) {
+            $station = $user->station;
+            $place = $station ? preg_replace('/^PGP\s+/u', '', $station->name) : null;
+            $stationContext = $station
+                ? "Korisnik pripada postaji \"{$station->name}\" (mjesto {$place}), na koordinatama "
+                    . round((float) $station->latitude, 4) . ', ' . round((float) $station->longitude, 4) . '.'
+                : 'Korisnik pripada postaji, ali njena lokacija nije poznata.';
+        }
+
+        $days = ['ponedjeljak', 'utorak', 'srijeda', 'četvrtak', 'petak', 'subota', 'nedjelja'];
+        $now = now();
+        $today = $days[$now->dayOfWeekIso - 1] . ', ' . $now->format('d.m.Y. H:i')
+            . ' (dow=' . ($now->dayOfWeekIso - 1) . ', block=' . intdiv($now->hour, 4) . ')';
+
         return <<<PROMPT
 Ti si AI asistent ugrađen u SkyGuard, sustav za upravljanje dronovima granične policije.
 Korisnici su policijski službenici koji nadziru granicu prema Bosni i Hercegovini i Srbiji dronovima i lovnim kamerama.
 Odgovaraj isključivo na hrvatskom jeziku, kratko i konkretno, bez nepotrebnog uvoda.
-Kad korisnik pita o rizičnim zonama, gdje pojačati ili smanjiti nadzor/letove, ili o statistici detekcija, MORAŠ prvo pozvati odgovarajući alat da dohvatiš stvarne podatke - nikad ne izmišljaj brojke ili koordinate.
-Koordinate zaokruži na 4 decimale. Ako korisnik ne navede lokaciju/vrijeme za predict_location_risk, koristi trenutni datum/vrijeme kao razumnu pretpostavku.
+{$stationContext}
+Danas je {$today}.
+Rizik se procjenjuje po žarištima (zonama K1, K2, ...) koja je algoritam DBSCAN izdvojio iz povijesnih detekcija; K1 je zona s najviše detekcija. Dan je podijeljen na 6 vremenskih blokova od 4 sata: 0 = 00–04, 1 = 04–08, 2 = 08–12, 3 = 12–16, 4 = 16–20, 5 = 20–24 h.
+Kad korisnik pita o rizičnim zonama, gdje pojačati ili smanjiti nadzor/letove, ili o statistici detekcija, MORAŠ prvo pozvati odgovarajući alat da dohvatiš stvarne podatke - nikad ne izmišljaj brojke, koordinate, zone ni imena mjesta.
+Za pitanja "gdje je rizik / kamo poslati dron" koristi get_zone_risk; ako korisnik navede dan ili doba dana (npr. "večeras", "u subotu ujutro"), pretvori to u dow i block. Za opis samih žarišta i dosadašnjeg nadzora koristi get_zones. Za pitanja o pouzdanosti modela koristi get_model_quality.
+Polje "risk_index" iz get_zone_risk je relativni indeks rizika (0-100) kojim model rangira zone; NIJE vjerojatnost - nikad ga ne prikazuj kao postotak ni kao "vjerojatnost detekcije", nego kao "indeks rizika X/100" i koristi ga za usporedbu zona. To je procjena modela strojnog učenja, ne sigurnost. Zone s preporukom "insufficient_data" nemaju dovoljno letova za pouzdanu procjenu; reci to umjesto da navodiš broj.
+Rezultati uz svaku zonu uključuju polje "near" s ljudski čitljivim opisom lokacije (npr. "2 km sjeverno od mjesta Ilok, uz rijeku Dunav") - UVIJEK opisuj lokaciju korisniku pomoću tog polja i oznake zone, nikad samo sirovim koordinatama. Koordinate smiješ dodati u zagradi kao sporednu informaciju, zaokružene na 4 decimale.
 PROMPT;
     }
 
@@ -162,33 +221,30 @@ PROMPT;
 
         return [
             [
-                'name' => 'get_risk_grid',
-                'description' => 'Prediktivna mreža rizika uz granicu (model treniran na povijesnim detekcijama), uspoređena s dosadašnjom pokrivenošću letova. Vraća popis preporuka gdje pojačati i gdje smanjiti nadzor. Koristi ovo za pitanja o tome gdje treba više/manje nadzora ili letova.',
+                'name' => 'get_zone_risk',
+                'description' => 'Procjena rizika po DBSCAN žarištima (K1, K2, ...) za zadani dan i vremenski blok: indeks rizika 0-100 (relativni, za rangiranje zona; nije vjerojatnost) prema najboljem modelu iz usporedbe modela, preporuka (increase = pojačati nadzor, maintain = zadržati, consider_reduction = razmotriti smanjenje, insufficient_data = premalo podataka) i kratko obrazloženje. Zone su poredane od najvećeg rizika. Bez dow/block vrijedi za trenutni dan i blok.',
+                'input_schema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'dow' => ['type' => 'integer', 'description' => 'Dan u tjednu, 0=ponedjeljak .. 6=nedjelja'],
+                        'block' => ['type' => 'integer', 'description' => 'Vremenski blok 0-5 (0=00-04, 1=04-08, 2=08-12, 3=12-16, 4=16-20, 5=20-24)'],
+                    ],
+                ],
+            ],
+            [
+                'name' => 'get_zones',
+                'description' => 'Opis DBSCAN žarišta: broj detekcija, broj letova i sati nadzora kroz zonu, detekcije po satu leta, najaktivniji dan i vremenski blok, trend zadnjih 30 dana u odnosu na prethodnih 30.',
                 'input_schema' => ['type' => 'object', 'properties' => $emptyObject],
             ],
             [
-                'name' => 'get_clusters',
-                'description' => 'DBSCAN klasteri (vruće točke) povijesnih detekcija s procjenom rizika po zoni.',
+                'name' => 'get_model_quality',
+                'description' => 'Rezultati usporedbe modela strojnog učenja koji procjenjuju rizik po zonama (kronološka evaluacija): koji je model najbolji i njegove mjere (F1, ROC-AUC, prosječna preciznost, pokrivenost 5/10 najrizičnijih zona). Koristi za pitanja o pouzdanosti procjena.',
                 'input_schema' => ['type' => 'object', 'properties' => $emptyObject],
             ],
             [
                 'name' => 'get_insights',
-                'description' => 'Opće statistike: ukupan broj detekcija, raspodjela po tipu, trend zadnjih 30 dana, postotak potvrđenih, broj kritičnih detekcija.',
+                'description' => 'Opće statistike detekcija: total = ukupan broj detekcija u CIJELOM razdoblju podataka (ne u zadnjih 30 dana), last_30d = broj detekcija u zadnjih 30 dana, by_type = broj osoba/entiteta po vrsti, by_source = broj detekcija po izvoru, trend_30d i trend_slope = smjer kretanja dnevnog broja detekcija u zadnjih 30 dana (rast/pad/stabilan).',
                 'input_schema' => ['type' => 'object', 'properties' => $emptyObject],
-            ],
-            [
-                'name' => 'predict_location_risk',
-                'description' => 'Procjena rizika za konkretnu lokaciju, sat i dan u tjednu.',
-                'input_schema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'lat' => ['type' => 'number', 'description' => 'Zemljopisna širina'],
-                        'lon' => ['type' => 'number', 'description' => 'Zemljopisna dužina'],
-                        'hour' => ['type' => 'integer', 'description' => 'Sat, 0-23'],
-                        'dow' => ['type' => 'integer', 'description' => 'Dan u tjednu, 0=ponedjeljak .. 6=nedjelja'],
-                    ],
-                    'required' => ['lat', 'lon', 'hour', 'dow'],
-                ],
             ],
         ];
     }
@@ -202,16 +258,12 @@ PROMPT;
 
         try {
             return match ($name) {
-                'get_risk_grid' => $this->trimRiskGrid(
-                    Http::timeout(15)->get("{$this->mlBase}/risk-grid", $query)->json()
-                ),
-                'get_clusters' => $this->trimClusters(
-                    Http::timeout(8)->get("{$this->mlBase}/clusters", $query)->json()
+                'get_zone_risk' => $this->zoneRisk($input, $stationId, $adminId),
+                'get_zones' => $this->zones($query, $stationId, $adminId),
+                'get_model_quality' => $this->modelQuality(
+                    Http::timeout(240)->get("{$this->mlBase}/zone-model-metrics", $query)->json()
                 ),
                 'get_insights' => Http::timeout(8)->get("{$this->mlBase}/insights", $query)->json(),
-                'predict_location_risk' => Http::timeout(6)
-                    ->get("{$this->mlBase}/predict", array_merge($query, $input))
-                    ->json(),
                 default => ['error' => 'Nepoznat alat'],
             };
         } catch (\Throwable $e) {
@@ -219,32 +271,208 @@ PROMPT;
         }
     }
 
-    /** Drop the full per-cell grid — the chat only needs the summary + top recommendations. */
-    private function trimRiskGrid(?array $data): array
+    // Postaje koje se smiju koristiti za opis lokacije: vlastita postaja,
+    // postaje uprave ili sve postaje za glavnog administratora
+    private function referenceStations(?int $stationId, ?int $adminId): Collection
     {
-        if (!$data) {
-            return ['error' => 'Nema odgovora od ML servisa'];
+        if ($stationId) {
+            return BorderPoliceStation::where('id', $stationId)->get();
+        }
+        if ($adminId) {
+            return BorderPoliceStation::where('police_administration_id', $adminId)->get();
         }
 
-        return [
-            'message' => $data['message'] ?? null,
-            'cell_km' => $data['cell_km'] ?? null,
-            'trained_on' => $data['trained_on'] ?? null,
-            'recommend_increase' => $data['recommend_increase'] ?? [],
-            'recommend_decrease' => $data['recommend_decrease'] ?? [],
-        ];
+        return BorderPoliceStation::all();
     }
 
-    /** Drop the raw noise points — keep only the identified clusters. */
-    private function trimClusters(?array $data): array
+    // Svakoj točki dodaje opis lokacije prema najbližoj postaji.
+    // Za korisnike jedne postaje izbacuje točke izvan područja postaje
+    // (ucrtana granica ili krug od 10 km).
+    private function enrichLocations(array $points, Collection $stations, bool $restrictToStations): array
     {
-        if (!$data) {
-            return ['error' => 'Nema odgovora od ML servisa'];
+        if ($stations->isEmpty()) {
+            return $restrictToStations ? [] : $points;
+        }
+
+        $kept = [];
+        foreach ($points as $point) {
+            if (!isset($point['lat'], $point['lon'])) {
+                continue;
+            }
+            $lat = (float) $point['lat'];
+            $lon = (float) $point['lon'];
+
+            $nearest = null;
+            $nearestDist = null;
+            foreach ($stations as $station) {
+                if ($station->latitude === null) {
+                    continue;
+                }
+                $d = $station->distanceKm($lat, $lon);
+                if ($nearestDist === null || $d < $nearestDist) {
+                    $nearestDist = $d;
+                    $nearest = $station;
+                }
+            }
+
+            if ($restrictToStations && (!$nearest || !$nearest->containsPoint($lat, $lon))) {
+                continue;
+            }
+
+            if ($nearest) {
+                $point['near'] = $this->describeLocation($lat, $lon, $nearest, $nearestDist);
+            }
+
+            $kept[] = $point;
+        }
+
+        return $kept;
+    }
+
+    private function describeLocation(float $lat, float $lon, BorderPoliceStation $station, float $distanceKm): string
+    {
+        $place = preg_replace('/^PGP\s+/u', '', $station->name);
+
+        $desc = $distanceKm < 1
+            ? "u neposrednoj blizini mjesta {$place}"
+            : round($distanceKm) . ' km ' . $this->compassBearing((float) $station->latitude, (float) $station->longitude, $lat, $lon) . " od mjesta {$place}";
+
+        if (!empty($station->landmark)) {
+            $desc .= ", {$station->landmark}";
+        }
+
+        return $desc;
+    }
+
+    private function compassBearing(float $lat0, float $lon0, float $lat1, float $lon1): string
+    {
+        $dLat = $lat1 - $lat0;
+        $dLon = ($lon1 - $lon0) * cos(deg2rad($lat0));
+        $angleDeg = rad2deg(atan2($dLon, $dLat));
+        if ($angleDeg < 0) {
+            $angleDeg += 360;
+        }
+
+        $labels = ['sjeverno', 'sjeveroistočno', 'istočno', 'jugoistočno', 'južno', 'jugozapadno', 'zapadno', 'sjeverozapadno'];
+
+        return $labels[(int) round($angleDeg / 45) % 8];
+    }
+
+    // Dani u tjednu kako ih broji MySQL (1 = nedjelja)
+    private const MYSQL_DOW_LABELS = [1 => 'nedjelja', 2 => 'ponedjeljak', 3 => 'utorak', 4 => 'srijeda',
+        5 => 'četvrtak', 6 => 'petak', 7 => 'subota'];
+
+    private function zoneRisk(array $input, ?int $stationId, ?int $adminId): array
+    {
+        $dow = isset($input['dow']) && $input['dow'] >= 0 && $input['dow'] <= 6 ? (int) $input['dow'] : null;
+        $block = isset($input['block']) && $input['block'] >= 0 && $input['block'] <= 5 ? (int) $input['block'] : null;
+
+        $zones = app(RecommendationService::class)->forDbscanZones($adminId, $stationId, $dow, $block);
+        if ($zones->isEmpty()) {
+            return ['error' => 'Nema procjene rizika — premalo detekcija za formiranje zona ili je ML servis nedostupan.'];
+        }
+
+        $rows = $zones
+            ->sortByDesc(fn ($z) => $z['probability'] ?? -1)
+            ->map(fn ($z) => [
+                'id' => $z['id'],
+                'lat' => $z['lat'],
+                'lon' => $z['lon'],
+                'risk_index' => $z['probability'],
+                'recommendation' => $z['type'],
+                'explanation' => $z['explanation'],
+                'detections_count' => $z['detections_count'],
+                'detections_last_30d' => $z['recent_count'],
+                'flights_count' => $z['flights_count'],
+                'total_hours' => $z['total_hours'],
+                'trend_pct' => $z['trend_pct'],
+            ])
+            ->values()
+            ->all();
+
+        $kept = $this->enrichLocations($rows, $this->referenceStations($stationId, $adminId), $stationId !== null);
+
+        return [
+            'dow' => $dow ?? now()->dayOfWeekIso - 1,
+            'block' => $block ?? intdiv(now()->hour, 4),
+            'zones' => $kept,
+        ] + $this->outsideTerritoryNote($rows, $kept);
+    }
+
+    // Ako žarišta postaje postoje, ali su izvan njezina područja, modelu se to objašnjava
+    // napomenom, inače bi dobio prazan popis i morao bi nagađati razlog.
+    private function outsideTerritoryNote(array $rows, array $kept): array
+    {
+        if (empty($rows) || !empty($kept)) {
+            return [];
+        }
+
+        return ['napomena' => 'Iz detekcija postaje izdvojeno je ' . count($rows) . ' žarište/a, ali se nijedno ne nalazi unutar područja postaje '
+            . '(ucrtana granica ili krug od 10 km oko postaje), pa se ne prikazuju. Procjena za područje postaje zato nije dostupna; to nije posljedica nedostatka podataka.'];
+    }
+
+    private function zones(array $query, ?int $stationId, ?int $adminId): array
+    {
+        $stats = Http::timeout(60)->get("{$this->mlBase}/zones/flight-stats", $query)->json('zones');
+        if (empty($stats)) {
+            return ['error' => 'Nema žarišta — premalo detekcija za formiranje zona.'];
+        }
+
+        $blocks = config('surveillance.time_blocks');
+        $rows = array_map(fn ($z) => [
+            'id' => $z['id'],
+            'lat' => $z['lat'],
+            'lon' => $z['lon'],
+            'detections_count' => $z['detections_count'],
+            'detections_last_30d' => $z['recent_count'] ?? null,
+            'flights_count' => $z['flights_count'],
+            'total_hours' => $z['total_hours'],
+            'detections_per_flight_hour' => $z['rate_per_hour'],
+            'most_active_day' => self::MYSQL_DOW_LABELS[$z['most_active_dow'] ?? 0] ?? null,
+            'most_active_block' => $blocks[$z['most_active_block'] ?? -1]['label'] ?? null,
+            'trend_pct' => $z['trend_pct'],
+            'last_detection_at' => $z['last_detection_at'],
+        ], $stats);
+
+        $kept = $this->enrichLocations($rows, $this->referenceStations($stationId, $adminId), $stationId !== null);
+
+        return ['zones' => $kept] + $this->outsideTerritoryNote($rows, $kept);
+    }
+
+    // Samo glavne mjere modela, bez krivulja i važnosti obilježja
+    private function modelQuality(?array $data): array
+    {
+        if (empty($data['trained'])) {
+            return ['error' => $data['message'] ?? 'Modeli nisu istrenirani — premalo podataka.'];
+        }
+
+        $nZones = $data['n_zones'] ?? null;
+        $models = [];
+        foreach ($data['models'] as $key => $m) {
+            $models[$key] = [
+                'naziv' => $m['label'],
+                'f1' => $m['f1'],
+                'precision' => $m['precision'],
+                'recall' => $m['recall'],
+                'roc_auc' => $m['roc_auc'],
+                'average_precision' => $m['average_precision'],
+                'pokrivenost_top5_zona' => $m['topk_coverage']['coverage_at_5'] ?? null,
+                'pokrivenost_top10_zona' => $m['topk_coverage']['coverage_at_10'] ?? null,
+            ];
         }
 
         return [
-            'clusters' => $data['clusters'] ?? [],
-            'total_detections' => $data['total_detections'] ?? 0,
+            'najbolji_model' => $data['best_model'],
+            'kriterij_odabira' => 'najveći F1 na testnom skupu',
+            'testno_razdoblje_od' => $data['split_date'],
+            'broj_primjera' => $data['n_rows'],
+            'udio_pozitivnih' => round($data['n_positive'] / max(1, $data['n_rows']), 3),
+            'broj_zona' => $nZones,
+            // pokrivenost top-K ima smisla samo uz usporedbu s nasumičnim odabirom
+            'nasumicni_odabir_top5_zona' => $nZones ? round(min(1, 5 / $nZones), 3) : null,
+            'nasumicni_odabir_top10_zona' => $nZones ? round(min(1, 10 / $nZones), 3) : null,
+            'napomena' => 'Prosječna preciznost nasumičnog modela približno je jednaka udjelu pozitivnih primjera. Pokrivenost top-K zona usporedi s nasumičnim odabirom; ako zona ima K ili manje, pokrivenost je trivijalno 1 i ništa ne govori o modelu.',
+            'modeli' => $models,
         ];
     }
 }

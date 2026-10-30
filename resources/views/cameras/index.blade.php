@@ -22,7 +22,7 @@
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
 
-{{-- ── Filter (super admin only) ─────────────────────────────────────────── --}}
+{{-- Filter (glavni administrator) --}}
 @if($administrations)
 <div class="card card-outline card-primary mb-3">
     <div class="card-body py-2">
@@ -60,7 +60,7 @@
 </div>
 @endif
 
-{{-- ── Filter (admin — own administration) ─────────────────────────────────── --}}
+{{-- Filter (administrator, vlastita uprava) --}}
 @if($stations)
 <div class="card card-outline card-primary mb-3">
     <div class="card-body py-2">
@@ -84,7 +84,7 @@
 </div>
 @endif
 
-{{-- ── Map ───────────────────────────────────────────────────────────────── --}}
+{{-- Karta --}}
 @php
     $mappedCameras = $cameras->filter(fn($c) => $c->latitude && $c->longitude);
     $mapData = $mappedCameras->map(fn($c) => [
@@ -97,8 +97,7 @@
         'url'      => route('cameras.show', $c),
     ])->values();
 
-    // One territory outline per distinct station represented on this page —
-    // the drawn boundary polygon if one exists, else the 10km fallback circle.
+    // područje svake postaje s ove stranice: ucrtana granica ili krug od 10 km
     $stationTerritories = $cameras->pluck('station')->filter()->unique('id')
         ->filter(fn($s) => $s->latitude)
         ->map(fn($s) => [
@@ -133,7 +132,7 @@
     </div>
 </div>
 
-{{-- ── Table ─────────────────────────────────────────────────────────────── --}}
+{{-- Tablica --}}
 <div class="card">
     <div class="card-body p-0">
         <table class="table table-striped mb-0">
@@ -231,7 +230,7 @@
 @section('js')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-{{-- ── Map ────────────────────────────────────────────────────── --}}
+{{-- Karta --}}
 const mapData = @json($mapData);
 
 @if($mappedCameras->isNotEmpty())
@@ -241,7 +240,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
 }).addTo(map);
 
-// Station territory outlines — drawn boundary polygon if one exists, else the 10km circle
+// područja postaja: ucrtana granica ili krug od 10 km
 const stationTerritories = @json($stationTerritories);
 const TERRITORY_RADIUS_M = {{ \App\Models\BorderPoliceStation::TERRITORY_RADIUS_KM * 1000 }};
 stationTerritories.forEach(st => {
@@ -300,7 +299,7 @@ if (bounds.length === 1) {
 }
 @endif
 
-{{-- ── Map toggle ──────────────────────────────────────────────── --}}
+{{-- Prikaz karte --}}
 const mapWrap    = document.getElementById('cam-map-wrap');
 const mapChevron = document.getElementById('cam-map-chevron');
 document.getElementById('cam-map-toggle').addEventListener('click', function () {
@@ -313,7 +312,7 @@ document.getElementById('cam-map-toggle').addEventListener('click', function () 
     @endif
 });
 
-{{-- ── Filter cascade (super admin) ──────────────────────────────── --}}
+{{-- Odabir uprave pa postaje (glavni administrator) --}}
 @if($administrations)
 const adminSelect   = document.getElementById('filter-admin');
 const stationSelect = document.getElementById('filter-station');

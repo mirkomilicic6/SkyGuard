@@ -1,7 +1,11 @@
 fastapi==0.136.1
 uvicorn==0.46.0
 scikit-learn==1.8.0
+scipy==1.17.1
 pandas==3.0.2
 pymysql==1.1.2
 python-dotenv==1.2.2
 numpy
+ultralytics==8.4.154
+opencv-python==5.0.0.93
+python-multipart==0.0.32

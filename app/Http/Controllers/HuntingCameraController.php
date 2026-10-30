@@ -39,7 +39,7 @@ class HuntingCameraController extends Controller
             ? PoliceAdministration::with('stations')->orderBy('name')->get()
             : null;
 
-        // Admin manages a whole administration — offer a station filter scoped to it.
+        // administrator uprave može filtrirati po postajama svoje uprave
         $stations = (!$isSuperAdmin && $user->hasRole('admin') && $user->station?->police_administration_id)
             ? BorderPoliceStation::where('police_administration_id', $user->station->police_administration_id)
                 ->orderBy('name')->get()

@@ -131,7 +131,6 @@ return [
             'person'     => 'Osoba',
             'group'      => 'Skupina',
             'vehicle'    => 'Vozilo',
-            'smuggling'  => 'Krijumčarenje',
             'other'      => 'Ostalo',
         ],
     ],

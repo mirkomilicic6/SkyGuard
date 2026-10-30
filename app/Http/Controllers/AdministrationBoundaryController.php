@@ -18,8 +18,7 @@ class AdministrationBoundaryController extends Controller
             $q->select('id', 'police_administration_id', 'name', 'latitude', 'longitude', 'boundary');
         }]);
 
-        // Every other administration's boundary, shown as a read-only reference
-        // layer so the admin can draw their own line up to the neighbour's.
+        // granice ostalih uprava prikazuju se kao pomoć pri crtanju vlastite granice
         $neighborAdministrations = PoliceAdministration::where('id', '!=', $administration->id)
             ->whereNotNull('boundary')
             ->get(['id', 'name', 'boundary']);

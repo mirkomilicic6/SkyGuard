@@ -94,8 +94,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
 }).addTo(map);
 
-// Station reference marker + 10km fallback circle — only shown until a real
-// boundary is drawn; once one exists, the circle is no longer relevant.
+// oznaka postaje i krug od 10 km, prikazuju se dok granica nije ucrtana
 L.marker([stationLat, stationLon]).addTo(map).bindPopup('{{ $station->name }}');
 let fallbackCircle = null;
 @if(!$station->hasBoundary())
@@ -105,7 +104,7 @@ fallbackCircle = L.circle([stationLat, stationLon], {
 }).addTo(map);
 @endif
 
-// Neighbouring stations' boundaries — read-only reference
+// granice susjednih postaja, samo za prikaz
 const neighborBoundaries = @json($neighborStations->map(fn($n) => ['name' => $n->name, 'boundary' => $n->boundary]));
 neighborBoundaries.forEach(n => {
     L.polygon(n.boundary, { color: '#6c757d', weight: 2, dashArray: '4,4', fillOpacity: 0.04, interactive: false })
@@ -113,7 +112,7 @@ neighborBoundaries.forEach(n => {
         .addTo(map);
 });
 
-// Editable layer — this station's own boundary (at most one polygon)
+// granica ove postaje koja se uređuje (najviše jedan poligon)
 const drawnItems = new L.FeatureGroup();
 map.addLayer(drawnItems);
 

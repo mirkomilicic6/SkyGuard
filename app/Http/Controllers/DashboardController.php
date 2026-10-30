@@ -11,6 +11,7 @@ use App\Models\Flight;
 use App\Models\GpxPoint;
 use App\Models\HuntingCamera;
 use App\Models\MaintenanceLog;
+use App\Models\PoliceAdministration;
 use App\Models\User;
 use App\Services\WeatherService;
 use Illuminate\Http\Request;
@@ -29,8 +30,13 @@ class DashboardController extends Controller
         }
 
         $isSupervisor = $user->hasRole(['admin', 'viewer']);
+        $isSuperAdmin = $user->station_id === null;
 
-        // Base query: supervisor sees all station flights, pilot sees own only
+        $administrations = $isSuperAdmin
+            ? PoliceAdministration::with('stations')->orderBy('name')->get()
+            : null;
+
+        // pilot vidi samo svoje letove, ostali sve letove svog opsega
         $flightBase = $isSupervisor
             ? $this->applyStationScope(Flight::query())
             : Flight::where('user_id', $user->id);
@@ -39,7 +45,7 @@ class DashboardController extends Controller
             ? $this->applyStationScope(Drone::query())
             : $user->drones();
 
-        // --- Stats ---
+        // statistika
         $stats = [
             'total_drones'       => (clone $droneBase)->count(),
             'active_drones'      => (clone $droneBase)->where('status', 'active')->count(),
@@ -54,16 +60,14 @@ class DashboardController extends Controller
                 ? $this->applyStationScope(User::role('pilot'))->count()
                 : User::role('pilot')->count(),
             'total_detections'   => Detection::query()
-                ->when($user->station_id, fn($q) =>
-                    $q->whereHas('flight', fn($fq) => $fq->where('station_id', $user->station_id))
-                )
+                ->when($user->station_id, fn($q) => $q->where('station_id', $user->station_id))
                 ->when(!$isSupervisor && !$user->station_id, fn($q) =>
-                    $q->where('user_id', $user->id)
+                    $q->where('created_by', $user->id)
                 )
                 ->count(),
         ];
 
-        // --- Monthly chart ---
+        // graf po mjesecima
         $availableYears = (clone $flightBase)
             ->selectRaw('YEAR(flight_date) as year')
             ->groupBy('year')
@@ -83,11 +87,11 @@ class DashboardController extends Controller
             ->pluck('count', 'month')
             ->toArray();
 
-        // --- Date filter (supervisors only) ---
+        // filter po datumu (ne za pilote)
         $dateFrom = $isSupervisor ? $request->input('date_from') : null;
         $dateTo   = $isSupervisor ? $request->input('date_to')   : null;
 
-        // --- Recent flights ---
+        // zadnji letovi
         $recentFlights = (clone $flightBase)
             ->with(['drone', 'pilot', 'station.administration'])
             ->when($dateFrom, fn($q) => $q->whereDate('flight_date', '>=', $dateFrom))
@@ -96,7 +100,7 @@ class DashboardController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        // --- Heatmap ---
+        // toplinska karta
         $heatmapPoints = GpxPoint::select('gpx_points.latitude', 'gpx_points.longitude')
             ->join('flights', 'flights.id', '=', 'gpx_points.flight_id')
             ->whereNull('flights.deleted_at')
@@ -112,7 +116,7 @@ class DashboardController extends Controller
             ->map(fn($p) => [$p->latitude, $p->longitude])
             ->values();
 
-        // --- Action queue (admin only) — faults awaiting review/accept ---
+        // kvarovi koji čekaju obradu (samo administrator)
         $pendingReview = $user->hasRole('admin')
             ? $this->applyStationScope(MaintenanceLog::where('status', MaintenanceLog::STATUS_PENDING))
                 ->with(['drone', 'reportedBy'])
@@ -121,7 +125,7 @@ class DashboardController extends Controller
                 ->get()
             : collect();
 
-        // --- Checkout widget (pilots only) ---
+        // zaduženi dron (samo pilot)
         $activeCheckout = null;
         $assignedDrones = collect();
 
@@ -146,8 +150,118 @@ class DashboardController extends Controller
         return view('dashboard', compact(
             'stats', 'recentFlights', 'monthlyFlights', 'heatmapPoints',
             'dateFrom', 'dateTo', 'chartYear', 'availableYears',
-            'activeCheckout', 'assignedDrones', 'pendingReview',
-        ) + ['isAdmin' => $isSupervisor]);
+            'activeCheckout', 'assignedDrones', 'pendingReview', 'administrations',
+        ) + ['isAdmin' => $isSupervisor, 'isSuperAdmin' => $isSuperAdmin]);
+    }
+
+    // Karta cijele mreže, samo za glavnog administratora: detekcije, putanje letova,
+    // lovačke kamere te granice postaja i uprava kao zasebni slojevi.
+    public function overviewMapData(Request $request)
+    {
+        $user = auth()->user();
+        abort_unless($user->station_id === null, 403);
+
+        $stationId = $request->filled('station_id') ? $request->integer('station_id') : null;
+        $administrationId = $request->filled('administration_id') ? $request->integer('administration_id') : null;
+
+        // ako je odabrana postaja, prikazuje se i granica njezine uprave
+        if ($stationId && !$administrationId) {
+            $administrationId = BorderPoliceStation::find($stationId)?->police_administration_id;
+        }
+
+        $detections = Detection::query()
+            ->when($stationId, fn($q) => $q->where('station_id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) =>
+                $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
+            )
+            ->when($request->filled('date_from'), fn($q) => $q->whereDate('detected_at', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('detected_at', '<=', $request->date('date_to')))
+            ->when($request->filled('detection_type'), fn($q) => $q->where('detection_type', $request->string('detection_type')))
+            ->when($request->filled('source'), fn($q) => $q->where('source', $request->string('source')))
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->get(['latitude', 'longitude', 'entity_count', 'detection_type', 'source', 'detected_at']);
+
+        $points = $detections->map(fn($d) => [
+            'lat'            => (float) $d->latitude,
+            'lon'            => (float) $d->longitude,
+            'entity_count'   => (int) $d->entity_count,
+            'detection_type' => $d->detection_type,
+            'source'         => $d->source,
+            'detected_at'    => $d->detected_at->translatedFormat('d.m.Y H:i'),
+        ])->values();
+
+        // putanje letova filtriraju se samo po datumu i postaji,
+        // a prikazuje se ograničen broj najnovijih letova zbog memorije i preglednosti karte
+        $routesQuery = Flight::query()
+            ->when($stationId, fn($q) => $q->where('station_id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) =>
+                $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
+            )
+            ->when($request->filled('date_from'), fn($q) => $q->whereDate('flight_date', '>=', $request->date('date_from')))
+            ->when($request->filled('date_to'), fn($q) => $q->whereDate('flight_date', '<=', $request->date('date_to')));
+
+        $routesTotal = (clone $routesQuery)->count();
+        $routesLimit = 500;
+
+        $routes = $routesQuery
+            ->orderByDesc('flight_date')
+            ->limit($routesLimit)
+            ->with(['gpxPoints' => fn($q) => $q->orderBy('point_order')->select('id', 'flight_id', 'latitude', 'longitude')])
+            ->get()
+            ->map(fn($f) => $f->gpxPoints->map(fn($p) => [(float) $p->latitude, (float) $p->longitude])->values())
+            ->filter(fn($pts) => $pts->count() > 1)
+            ->values();
+
+        $cameras = HuntingCamera::query()
+            ->when($stationId, fn($q) => $q->where('station_id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) =>
+                $q->whereHas('station', fn($s) => $s->where('police_administration_id', $administrationId))
+            )
+            ->with('station')
+            ->whereNotNull('latitude')->whereNotNull('longitude')
+            ->get()
+            ->map(fn($c) => [
+                'lat'           => (float) $c->latitude,
+                'lon'           => (float) $c->longitude,
+                'name'          => $c->name,
+                'location_name' => $c->location_name,
+                'is_active'     => (bool) $c->is_active,
+                'station_name'  => $c->station->name ?? null,
+            ])->values();
+
+        $stations = BorderPoliceStation::query()
+            ->when($stationId, fn($q) => $q->where('id', $stationId))
+            ->when(!$stationId && $administrationId, fn($q) => $q->where('police_administration_id', $administrationId))
+            ->with('administration')
+            ->get()
+            ->map(fn($s) => [
+                'id'                  => $s->id,
+                'name'                => $s->name,
+                'lat'                 => (float) $s->latitude,
+                'lon'                 => (float) $s->longitude,
+                'administration_name' => $s->administration->name ?? null,
+                'boundary'            => $s->hasBoundary() ? $s->boundary : null,
+                'radius_km'           => BorderPoliceStation::TERRITORY_RADIUS_KM,
+            ])->values();
+
+        $administrationAreas = PoliceAdministration::query()
+            ->when($administrationId, fn($q) => $q->where('id', $administrationId))
+            ->get()
+            ->map(fn($a) => [
+                'id'       => $a->id,
+                'name'     => $a->name,
+                'boundary' => $a->hasBoundary() ? $a->boundary : null,
+            ])->values();
+
+        return response()->json([
+            'points'          => $points,
+            'routes'          => $routes,
+            'routes_total'    => $routesTotal,
+            'routes_shown'    => $routes->count(),
+            'cameras'         => $cameras,
+            'stations'        => $stations,
+            'administrations' => $administrationAreas,
+        ]);
     }
 
     private function pilotHome(User $user, WeatherService $weather)
@@ -219,12 +333,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * Lightweight preview of the risk-grid recommendations for the pilot's
-     * station — pure ML data, no LLM call, so it's cheap enough to load on
-     * every dashboard visit. The full natural-language version lives in the
-     * AI chat assistant.
-     */
+    // Kratki pregled preporuka iz mreže rizika za postaju pilota, bez jezičnog modela
     private function fetchAiRiskSummary(?BorderPoliceStation $station): ?array
     {
         if (!$station) {
@@ -235,7 +344,7 @@ class DashboardController extends Controller
         $params  = $adminId ? ['administration_id' => $adminId] : ['station_id' => $station->id];
 
         try {
-            $response = Http::timeout(6)->get('http://127.0.0.1:8001/risk-grid', $params);
+            $response = Http::timeout(20)->get(config('services.ml.url') . '/risk-grid', $params);
             if (!$response->successful()) {
                 return null;
             }

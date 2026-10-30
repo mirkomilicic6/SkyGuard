@@ -7,7 +7,7 @@
 
 @section('content')
 
-{{-- ── PAGE HEADER ──────────────────────────────────────────── --}}
+{{-- Zaglavlje --}}
 <div class="fs-header mb-4">
     <div class="fs-header-left">
         <a href="{{ route('flights.index') }}" class="fs-back-btn">
@@ -41,13 +41,13 @@
     </div>
 @endif
 
-{{-- ── MAIN GRID ────────────────────────────────────────────── --}}
+{{-- Glavni dio --}}
 <div class="row">
 
-{{-- LEFT COLUMN ──────────────────────────────────────────────── --}}
+{{-- Lijevi stupac --}}
 <div class="col-lg-4">
 
-    {{-- Flight Stats --}}
+    {{-- Podaci o letu --}}
     <div class="fs-card mb-3">
         <div class="fs-card-header">
             <i class="fas fa-chart-bar mr-2" style="color:var(--gold)"></i>
@@ -108,7 +108,7 @@
         @endif
     </div>
 
-    {{-- Detections Panel --}}
+    {{-- Detekcije --}}
     <div class="fs-card">
         <div class="fs-card-header">
             <div class="d-flex align-items-center gap-2" style="gap:.6rem">
@@ -127,15 +127,15 @@
                 <div class="fs-det-body">
                     <div class="fs-det-title">
                         <i class="fas {{ $det->typeIcon() }} mr-1" style="color:{{ $det->typeColor() }}"></i>
-                        {{ __('ui.detections.types.' . $det->type, [], null) ?: ucfirst($det->type) }}
-                        <span class="fs-det-count">×{{ $det->count }}</span>
+                        {{ __('ui.detections.types.' . $det->detection_type, [], null) ?: ucfirst($det->detection_type) }}
+                        <span class="fs-det-count">×{{ $det->entity_count }}</span>
                     </div>
                     <div class="fs-det-meta">{{ $det->detected_at->translatedFormat('d F H:i') }} &middot; {{ $det->user->name }}</div>
-                    @if($det->notes)
-                    <div class="fs-det-notes">{{ Str::limit($det->notes, 70) }}</div>
+                    @if($det->note)
+                    <div class="fs-det-notes">{{ Str::limit($det->note, 70) }}</div>
                     @endif
                 </div>
-                @if(auth()->user()->hasRole('admin') || $det->user_id === auth()->id())
+                @if(auth()->user()->hasRole('admin') || $det->created_by === auth()->id())
                 <button class="fs-det-delete btn-delete-detection"
                         data-id="{{ $det->id }}"
                         data-url="{{ route('detections.destroy', $det) }}"
@@ -153,12 +153,12 @@
         </div>
     </div>
 
-</div>{{-- /left col --}}
+</div>{{-- kraj lijevog stupca --}}
 
-{{-- RIGHT COLUMN ─────────────────────────────────────────────── --}}
+{{-- Desni stupac --}}
 <div class="col-lg-8">
 
-    {{-- Map --}}
+    {{-- Karta --}}
     <div class="fs-card mb-3">
         <div class="fs-card-header">
             <i class="fas fa-map-marked-alt mr-2" style="color:var(--gold)"></i>
@@ -180,7 +180,7 @@
         @endif
     </div>
 
-    {{-- Altitude chart --}}
+    {{-- Graf visine --}}
     @if($flight->gpxPoints->count() > 0)
     <div class="fs-card">
         <div class="fs-card-header">
@@ -193,12 +193,10 @@
     </div>
     @endif
 
-</div>{{-- /right col --}}
-</div>{{-- /row --}}
+</div>{{-- kraj desnog stupca --}}
+</div>{{-- kraj retka --}}
 
-{{-- ================================================================
-     DETECTION MODAL (dark themed)
-     ================================================================ --}}
+{{-- Prozor za unos detekcije --}}
 @if(!auth()->user()->hasRole('viewer'))
 <div class="fs-modal-backdrop" id="detModal" style="display:none" onclick="if(event.target===this)closeDetModal()">
     <div class="fs-modal">
@@ -213,7 +211,7 @@
             <input type="hidden" id="det_lat">
             <input type="hidden" id="det_lon">
 
-            {{-- Coordinates --}}
+            {{-- Koordinate --}}
             <div class="fs-modal-coords mb-3">
                 <div class="fs-coord-box">
                     <div class="fs-coord-label">{{ __('ui.detections.latitude') }}</div>
@@ -226,7 +224,7 @@
                 </div>
             </div>
 
-            {{-- Type --}}
+            {{-- Vrsta --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.type') }}</label>
                 <div class="fs-type-grid" id="typeGrid">
@@ -234,7 +232,6 @@
                         ['value'=>'person',    'label'=>__('ui.detections.types.person'),    'icon'=>'fa-user',           'color'=>'#fd7e14'],
                         ['value'=>'group',     'label'=>__('ui.detections.types.group'),     'icon'=>'fa-users',          'color'=>'#dc3545'],
                         ['value'=>'vehicle',   'label'=>__('ui.detections.types.vehicle'),   'icon'=>'fa-car',            'color'=>'#0d6efd'],
-                        ['value'=>'smuggling', 'label'=>__('ui.detections.types.smuggling'), 'icon'=>'fa-box',            'color'=>'#6f42c1'],
                         ['value'=>'other',     'label'=>__('ui.detections.types.other'),     'icon'=>'fa-question-circle','color'=>'#6c757d'],
                     ] as $t)
                     <button type="button" class="fs-type-btn" data-value="{{ $t['value'] }}"
@@ -247,7 +244,7 @@
                 <input type="hidden" id="det_type" value="person">
             </div>
 
-            {{-- Count --}}
+            {{-- Broj --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.count') }}</label>
                 <div class="fs-count-row">
@@ -257,14 +254,14 @@
                 </div>
             </div>
 
-            {{-- Notes --}}
+            {{-- Napomena --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.notes') }} <span class="fs-optional">({{ __('ui.optional') }})</span></label>
-                <textarea id="det_notes" class="fs-textarea" rows="2" maxlength="500"
+                <textarea id="det_note" class="fs-textarea" rows="2" maxlength="500"
                           placeholder="{{ __('ui.detections.notes_placeholder') ?? '' }}"></textarea>
             </div>
 
-            {{-- Time --}}
+            {{-- Vrijeme --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.detected_at') }} <span class="fs-optional">({{ __('ui.optional') }})</span></label>
                 <input type="datetime-local" id="det_detected_at" class="fs-input">
@@ -285,10 +282,10 @@
 @section('css')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-/* ── HIDE CONTENT HEADER ─────────────────────────────── */
+/* Skriveno zaglavlje */
 .content-header { display: none; }
 
-/* ── PAGE HEADER ─────────────────────────────────────── */
+/* Zaglavlje */
 .fs-header {
     display: flex;
     align-items: center;
@@ -338,7 +335,7 @@
 .fs-link { color: var(--gold) !important; text-decoration: none; }
 .fs-link:hover { text-decoration: underline; }
 
-/* ── CARD ────────────────────────────────────────────── */
+/* Kartica */
 .fs-card {
     background: var(--navy-card);
     border: 1px solid rgba(255,255,255,.06);
@@ -365,7 +362,7 @@
 
 .fs-hint-label { font-size: .7rem; color: rgba(255,255,255,.3); font-weight: 400; white-space: nowrap; }
 
-/* ── STAT GRID ───────────────────────────────────────── */
+/* Podaci o letu */
 .fs-stat-grid { display: grid; grid-template-columns: 1fr 1fr; }
 .fs-stat {
     display: flex;
@@ -385,7 +382,7 @@
 .fs-stat-val { font-size: .88rem; font-weight: 600; color: #fff; }
 .fs-stat-lbl { font-size: .68rem; color: rgba(255,255,255,.35); margin-top: 1px; text-transform: uppercase; letter-spacing: .4px; }
 
-/* ── DETECTION LIST ──────────────────────────────────── */
+/* Popis detekcija */
 .fs-detection-list { padding: .4rem 0; max-height: 340px; overflow-y: auto; }
 .fs-det-item {
     display: flex;
@@ -441,7 +438,7 @@
 }
 .fs-det-empty i { font-size: 1.6rem; }
 
-/* ── EMPTY MAP ───────────────────────────────────────── */
+/* Prazna karta */
 .fs-empty-map {
     height: 220px;
     display: flex; flex-direction: column;
@@ -450,7 +447,7 @@
 }
 .fs-empty-map div { font-size: .9rem; }
 
-/* ── MODAL ───────────────────────────────────────────── */
+/* Prozor */
 .fs-modal-backdrop {
     position: fixed; inset: 0;
     background: rgba(0,0,0,.6);
@@ -490,7 +487,7 @@
     border-top: 1px solid rgba(255,255,255,.08);
 }
 
-/* Coordinates */
+/* Koordinate */
 .fs-modal-coords {
     display: flex; align-items: center; gap: .5rem;
     background: rgba(0,0,0,.25);
@@ -503,7 +500,7 @@
 .fs-coord-val { font-size: .82rem; font-weight: 600; color: #fff; margin-top: 2px; font-family: monospace; }
 .fs-coord-sep { color: rgba(255,255,255,.2); font-size: 1rem; }
 
-/* Form elements */
+/* Polja obrasca */
 .fs-form-group { margin-bottom: 1rem; }
 .fs-label {
     display: block;
@@ -529,8 +526,8 @@
 }
 .fs-textarea { resize: none; }
 
-/* Type selector */
-.fs-type-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: .4rem; }
+/* Odabir vrste */
+.fs-type-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: .4rem; }
 .fs-type-btn {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -555,7 +552,7 @@
     color: #fff;
 }
 
-/* Count row */
+/* Broj */
 .fs-count-row { display: flex; align-items: center; gap: .5rem; width: 140px; }
 .fs-count-btn {
     width: 34px; height: 34px; border-radius: 8px;
@@ -574,7 +571,7 @@
     padding: 6px; font-size: .9rem; font-weight: 600;
 }
 
-/* Buttons */
+/* Gumbi */
 .fs-btn-cancel {
     padding: 8px 18px; border-radius: 9px;
     background: rgba(255,255,255,.07);
@@ -595,10 +592,10 @@
 .fs-btn-save:hover { background: rgba(244,109,67,.35); color: #fff; }
 .fs-btn-save:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Map cursor */
+/* Pokazivač na karti */
 #map { cursor: crosshair; }
 
-/* Leaflet popup dark */
+/* Tamni skočni prozor na karti */
 .leaflet-popup-content-wrapper {
     background: #0d2460 !important;
     border: 1px solid rgba(255,255,255,.12) !important;
@@ -625,19 +622,19 @@ $gpxData = $flight->gpxPoints->map(fn($p) => [
     'order' => $p->point_order,
 ]);
 $existingDetections = $flight->detections->map(fn($d) => [
-    'id'          => $d->id,
-    'latitude'    => $d->latitude,
-    'longitude'   => $d->longitude,
-    'type'        => $d->type,
-    'type_label'  => __('ui.detections.types.' . $d->type) ?: ucfirst($d->type),
-    'count'       => $d->count,
-    'notes'       => $d->notes,
-    'detected_at' => $d->detected_at->translatedFormat('d F Y H:i'),
-    'color'       => $d->typeColor(),
-    'icon'        => $d->typeIcon(),
-    'reported_by' => $d->user->name,
-    'can_delete'  => auth()->user()->hasRole('admin') || $d->user_id === auth()->id(),
-    'delete_url'  => route('detections.destroy', $d),
+    'id'             => $d->id,
+    'latitude'       => $d->latitude,
+    'longitude'      => $d->longitude,
+    'detection_type' => $d->detection_type,
+    'type_label'     => __('ui.detections.types.' . $d->detection_type) ?: ucfirst($d->detection_type),
+    'entity_count'   => $d->entity_count,
+    'note'           => $d->note,
+    'detected_at'    => $d->detected_at->translatedFormat('d F Y H:i'),
+    'color'          => $d->typeColor(),
+    'icon'           => $d->typeIcon(),
+    'reported_by'    => $d->user->name,
+    'can_delete'     => auth()->user()->hasRole('admin') || $d->created_by === auth()->id(),
+    'delete_url'     => route('detections.destroy', $d),
 ]);
 @endphp
 <script>
@@ -654,7 +651,7 @@ const i18n = {
     altLabel:      "{{ __('ui.flights.altitude_label') }}",
 };
 
-// ── MAP ──────────────────────────────────────────────────────
+// Karta
 const latlngs = gpxPoints.map(p => [p.lat, p.lon]);
 const map = L.map('map');
 
@@ -662,13 +659,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
 }).addTo(map);
 
-// Flight path — dark casing underneath for contrast against the light basemap
+// putanja leta s tamnim rubom da se bolje vidi na svijetloj podlozi
 L.polyline(latlngs, { color: '#0d2460', weight: 5, opacity: 0.9 }).addTo(map);
 L.polyline(latlngs, { color: '#f0c040', weight: 2.5, opacity: 0.95 }).addTo(map);
 const bounds = L.latLngBounds(latlngs);
 map.fitBounds(bounds, { padding: [25, 25] });
 
-// Start / End markers
+// oznake početka i kraja
 const dotIcon = (color) => L.divIcon({
     className: '', iconSize: [14, 14], iconAnchor: [7, 7],
     html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.5)"></div>`
@@ -679,7 +676,7 @@ const last = gpxPoints[gpxPoints.length - 1];
 L.marker([last.lat, last.lon], { icon: dotIcon('#dc3545') }).addTo(map)
   .bindPopup('<strong style="color:#f5a0a0">End</strong>' + (last.time ? '<br><small>' + last.time + '</small>' : ''));
 
-// Waypoints
+// međutočke
 const step = Math.max(1, Math.floor(gpxPoints.length / 8));
 gpxPoints.forEach((p, i) => {
     if (i === 0 || i === gpxPoints.length - 1 || i % step !== 0) return;
@@ -688,7 +685,7 @@ gpxPoints.forEach((p, i) => {
      .bindPopup([p.time ? '<small>'+p.time+'</small>' : '', p.alt != null ? 'Alt: <strong>'+p.alt+' m</strong>' : '', p.speed != null ? 'Speed: <strong>'+p.speed+' km/h</strong>' : ''].filter(Boolean).join('<br>'));
 });
 
-// ── DETECTION PINS ───────────────────────────────────────────
+// Oznake detekcija
 const detectionMarkers = {};
 
 function makePin(color) {
@@ -703,12 +700,12 @@ function makePin(color) {
 }
 
 function addDetectionMarker(d) {
-    const label = d.type_label || (d.type.charAt(0).toUpperCase() + d.type.slice(1));
+    const label = d.type_label || (d.detection_type.charAt(0).toUpperCase() + d.detection_type.slice(1));
     const popup = `
         <div style="min-width:150px">
-            <strong>${label}</strong> <span style="color:rgba(255,255,255,.5)">×${d.count}</span><br>
+            <strong>${label}</strong> <span style="color:rgba(255,255,255,.5)">×${d.entity_count}</span><br>
             <small style="color:rgba(255,255,255,.45)">${d.detected_at} · ${d.reported_by}</small>
-            ${d.notes ? `<br><small style="color:rgba(255,255,255,.55);font-style:italic">${d.notes}</small>` : ''}
+            ${d.note ? `<br><small style="color:rgba(255,255,255,.55);font-style:italic">${d.note}</small>` : ''}
             ${d.can_delete ? `<br><button onclick="deleteDetection(${d.id},'${d.delete_url}')" style="margin-top:6px;padding:3px 10px;border-radius:6px;background:rgba(220,53,69,.2);border:1px solid rgba(220,53,69,.4);color:#f5a0a0;cursor:pointer;font-size:.72rem">Obriši</button>` : ''}
         </div>`;
     const marker = L.marker([d.latitude, d.longitude], { icon: makePin(d.color) })
@@ -718,9 +715,9 @@ function addDetectionMarker(d) {
 
 existingDetections.forEach(addDetectionMarker);
 
-// ── MODAL LOGIC ───────────────────────────────────────────────
+// Prozor za unos detekcije
 @if(!auth()->user()->hasRole('viewer'))
-// Select first type button by default
+// prva vrsta je odabrana unaprijed
 document.querySelector('.fs-type-btn[data-value="person"]')?.classList.add('active');
 
 function openDetModal(lat, lng) {
@@ -728,7 +725,7 @@ function openDetModal(lat, lng) {
     document.getElementById('det_lon').value         = lng;
     document.getElementById('det_lat_display').textContent = parseFloat(lat).toFixed(5);
     document.getElementById('det_lon_display').textContent = parseFloat(lng).toFixed(5);
-    document.getElementById('det_notes').value       = '';
+    document.getElementById('det_note').value        = '';
     document.getElementById('det_count').value       = 1;
     document.getElementById('det_detected_at').value = '';
     document.getElementById('det_type').value        = 'person';
@@ -763,12 +760,12 @@ document.getElementById('btnSaveDetection').addEventListener('click', function()
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
         body: JSON.stringify({
-            latitude:    document.getElementById('det_lat').value,
-            longitude:   document.getElementById('det_lon').value,
-            type:        document.getElementById('det_type').value,
-            count:       document.getElementById('det_count').value,
-            notes:       document.getElementById('det_notes').value || null,
-            detected_at: document.getElementById('det_detected_at').value || null,
+            latitude:       document.getElementById('det_lat').value,
+            longitude:      document.getElementById('det_lon').value,
+            detection_type: document.getElementById('det_type').value,
+            entity_count:   document.getElementById('det_count').value,
+            note:           document.getElementById('det_note').value || null,
+            detected_at:    document.getElementById('det_detected_at').value || null,
         }),
     })
     .then(r => r.json())
@@ -787,7 +784,7 @@ document.getElementById('btnSaveDetection').addEventListener('click', function()
     });
 });
 
-// Delete from list
+// brisanje s popisa
 document.addEventListener('click', function(e) {
     const btn = e.target.closest('.fs-det-delete');
     if (!btn) return;
@@ -815,7 +812,7 @@ function deleteDetection(id, url) {
 function addDetectionToList(d) {
     const noItem = document.getElementById('noDetections');
     if (noItem) noItem.remove();
-    const label = d.type_label || (d.type.charAt(0).toUpperCase() + d.type.slice(1));
+    const label = d.type_label || (d.detection_type.charAt(0).toUpperCase() + d.detection_type.slice(1));
     const el = document.createElement('div');
     el.className = 'fs-det-item';
     el.id = 'det-' + d.id;
@@ -824,10 +821,10 @@ function addDetectionToList(d) {
         <div class="fs-det-body">
             <div class="fs-det-title">
                 <i class="fas ${d.icon} mr-1" style="color:${d.color}"></i>
-                ${label} <span class="fs-det-count">×${d.count}</span>
+                ${label} <span class="fs-det-count">×${d.entity_count}</span>
             </div>
             <div class="fs-det-meta">${d.detected_at} · ${d.reported_by}</div>
-            ${d.notes ? `<div class="fs-det-notes">${d.notes.substring(0,70)}</div>` : ''}
+            ${d.note ? `<div class="fs-det-notes">${d.note.substring(0,70)}</div>` : ''}
         </div>
         <button class="fs-det-delete btn-delete-detection" data-id="${d.id}" data-url="${d.delete_url}">
             <i class="fas fa-times"></i>
@@ -841,7 +838,7 @@ function updateCount(delta) {
 }
 @endif
 
-// ── ALTITUDE CHART ───────────────────────────────────────────
+// Graf visine
 const altCtx  = document.getElementById('altitudeChart').getContext('2d');
 const altGrad = altCtx.createLinearGradient(0, 0, 0, 180);
 altGrad.addColorStop(0, 'rgba(111,66,193,0.4)');

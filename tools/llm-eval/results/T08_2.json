@@ -1,0 +1,12 @@
+{
+    "id": "T08",
+    "rep": 2,
+    "user": "admin@mup.hr",
+    "query": "Kakvo je trenutno stanje u žarištu K99?",
+    "ran_at": "2026-10-26 20:05:49",
+    "seconds": 2.5,
+    "status": 200,
+    "tool_calls": [],
+    "tool_results": [],
+    "reply": "Žarište K99 ne postoji u sustavu. Da provjerim koja su žarišta dostupna i njihovo stanje?"
+}

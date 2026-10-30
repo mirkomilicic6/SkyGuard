@@ -1,0 +1,4 @@
+T01 rep1 8.4s tools=get_zone_risk{"dow":0,"block":5}
+T01 rep2 8.1s tools=get_zone_risk{"dow":0,"block":5}
+T07 rep1 9.5s tools=get_zone_risk[]
+T07 rep2 9.6s tools=get_zone_risk[]

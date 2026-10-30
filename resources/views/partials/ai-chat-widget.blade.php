@@ -1,4 +1,4 @@
-{{-- ── AI asistent — floating chat widget ──────────────────────────────── --}}
+{{-- AI asistent, mali prozor za razgovor --}}
 <button id="aiChatToggle" class="ai-chat-toggle" title="AI asistent">
     <i class="fas fa-robot"></i>
 </button>
@@ -6,7 +6,10 @@
 <div id="aiChatPanel" class="ai-chat-panel" style="display:none">
     <div class="ai-chat-header">
         <div><i class="fas fa-robot mr-2" style="color:var(--gold)"></i>AI asistent</div>
-        <button id="aiChatClose" class="ai-chat-close">&times;</button>
+        <div class="ai-chat-header-actions">
+            <button id="aiChatExpand" class="ai-chat-icon-btn" title="Otvori u punom prikazu"><i class="fas fa-expand-alt"></i></button>
+            <button id="aiChatClose" class="ai-chat-close">&times;</button>
+        </div>
     </div>
     <div id="aiChatMessages" class="ai-chat-messages">
         <div class="ai-chat-msg ai-chat-msg-bot">
@@ -32,7 +35,7 @@
 </div>
 
 <style>
-/* ── AI chat widget ───────────────────────────────────────────── */
+/* AI asistent */
 .ai-chat-toggle {
     position: fixed; bottom: 24px; right: 24px; z-index: 1050;
     width: 56px; height: 56px; border-radius: 50%;
@@ -53,8 +56,11 @@
     padding: .8rem 1rem; font-weight: 600; color: #fff;
     border-bottom: 1px solid rgba(255,255,255,0.08);
 }
+.ai-chat-header-actions { display: flex; align-items: center; gap: .6rem; }
 .ai-chat-close { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 1.4rem; line-height: 1; cursor: pointer; }
 .ai-chat-close:hover { color: #fff; }
+.ai-chat-icon-btn { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 1rem; line-height: 1; cursor: pointer; }
+.ai-chat-icon-btn:hover { color: var(--gold); }
 .ai-chat-messages { flex: 1; overflow-y: auto; padding: .9rem; display: flex; flex-direction: column; gap: .6rem; }
 .ai-chat-msg { font-size: .85rem; line-height: 1.4; padding: .5rem .75rem; border-radius: 10px; max-width: 90%; white-space: pre-wrap; }
 .ai-chat-msg-bot { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); align-self: flex-start; }
@@ -98,7 +104,7 @@
 }
 .ai-chat-map-expand:hover { background: rgba(13,36,96,1); border-color: var(--gold); color: var(--gold); }
 
-/* ── Expanded map modal ──────────────────────────────────────── */
+/* Uvećana karta */
 .ai-chat-map-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
 .ai-chat-map-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
 .ai-chat-map-modal-inner {
@@ -115,14 +121,15 @@
 </style>
 
 <script>
-// ── AI chat widget ────────────────────────────────────────────────────────
+// AI asistent
 (function () {
-    const toggle   = document.getElementById('aiChatToggle');
-    const panel    = document.getElementById('aiChatPanel');
-    const closeBtn = document.getElementById('aiChatClose');
-    const messages = document.getElementById('aiChatMessages');
-    const input    = document.getElementById('aiChatInput');
-    const sendBtn  = document.getElementById('aiChatSend');
+    const toggle    = document.getElementById('aiChatToggle');
+    const panel     = document.getElementById('aiChatPanel');
+    const closeBtn  = document.getElementById('aiChatClose');
+    const expandBtn = document.getElementById('aiChatExpand');
+    const messages  = document.getElementById('aiChatMessages');
+    const input     = document.getElementById('aiChatInput');
+    const sendBtn   = document.getElementById('aiChatSend');
 
     let history = [];
     let busy = false;
@@ -135,9 +142,11 @@
 
     const MAP_KIND = {
         increase:   { color: '#dc3545', label: 'Pojačati nadzor' },
-        decrease:   { color: '#28a745', label: 'Smanjiti nadzor' },
-        cluster:    { color: '#fd7e14', label: 'Klaster detekcija' },
-        prediction: { color: '#6f42c1', label: 'Procjena lokacije' },
+        maintain:   { color: '#fd7e14', label: 'Zadržati nadzor' },
+        decrease:   { color: '#28a745', label: 'Razmotriti smanjenje' },
+        cluster:    { color: '#6f42c1', label: 'Žarište detekcija' },
+        insufficient: { color: '#8a94a6', label: 'Premalo podataka' },
+        station:    { color: '#f0c040', label: 'Vaša postaja' },
     };
 
     function legendHtml(points) {
@@ -148,11 +157,26 @@
     function addMarkersTo(map, points) {
         return points.map(p => {
             const style = MAP_KIND[p.kind] || { color: '#6f42c1', label: p.kind };
+
+            // postaja korisnika crta se drukčije (kvadrat i naziv), kao orijentir, a ne kao preporuka
+            if (p.kind === 'station') {
+                const marker = L.marker([p.lat, p.lon], {
+                    icon: L.divIcon({
+                        className: '',
+                        html: `<div style="width:14px;height:14px;background:${style.color};border:2px solid #fff;box-shadow:0 0 3px rgba(0,0,0,.5)"></div>`,
+                        iconSize: [14, 14], iconAnchor: [7, 7],
+                    }),
+                }).addTo(map);
+                marker.bindPopup(`<strong>${style.label}</strong><br>${p.value ?? ''}`);
+                return marker;
+            }
+
             const marker = L.circleMarker([p.lat, p.lon], {
                 radius: 8, color: style.color, fillColor: style.color, fillOpacity: 0.75, weight: 2,
             }).addTo(map);
-            const valueLine = (p.value ?? null) !== null ? `<br>Rizik: ${p.value}` : '';
-            marker.bindPopup(`<strong>${style.label}</strong><br>${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}${valueLine}`);
+            const valueLine = (p.value ?? null) !== null ? `<br>Zona ${p.value}` : '';
+            const nearLine = p.near ? `<br>${p.near}` : '';
+            marker.bindPopup(`<strong>${style.label}</strong>${nearLine}<br><small>${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</small>${valueLine}`);
             return marker;
         });
     }
@@ -243,6 +267,22 @@
         if (panel.style.display === 'flex') input.focus();
     });
     closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
+
+    // prijenos razgovora na stranicu asistenta: prikazane poruke i povijest razgovora.
+    // Karte iz ranijih odgovora se ne prenose.
+    expandBtn.addEventListener('click', () => {
+        // kind je vrsta poruke (bot, korisnik, greška)
+        const transcript = Array.from(messages.children)
+            .filter(el => el.classList.contains('ai-chat-msg') && !el.classList.contains('ai-chat-map-wrap'))
+            .map(el => ({ text: el.textContent, kind: el.classList.contains('ai-chat-msg-user') ? 'user'
+                : el.classList.contains('ai-chat-msg-error') ? 'error' : 'bot' }));
+
+        try {
+            sessionStorage.setItem('aiChatTransfer', JSON.stringify({ history, transcript }));
+        } catch (e) { /* spremište nije dostupno, pa stranica počinje novi razgovor */ }
+
+        window.location.href = '{{ route('chat.page') }}';
+    });
 
     function addMessage(text, cls) {
         const div = document.createElement('div');

@@ -26,8 +26,7 @@ class StationBoundaryController extends Controller
     {
         $this->authorizeStation($station);
 
-        // Every other station's boundary, shown as a read-only reference layer
-        // so the admin/viewer can draw their own line up to the neighbour's.
+        // granice ostalih postaja prikazuju se kao pomoć pri crtanju vlastite granice
         $neighborStations = BorderPoliceStation::where('id', '!=', $station->id)
             ->whereNotNull('boundary')
             ->get(['id', 'name', 'boundary']);

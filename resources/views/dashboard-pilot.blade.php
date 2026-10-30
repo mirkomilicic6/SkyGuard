@@ -20,9 +20,7 @@
     </div>
 @endif
 
-{{-- ================================================================
-     GREETING + WEATHER
-     ================================================================ --}}
+{{-- Pozdrav i vremenska prognoza --}}
 <div class="ph-header mb-4">
     <div class="ph-greeting">
         <div class="ph-greeting-title">{{ __('ui.home.welcome', ['name' => $user->name]) }}</div>
@@ -67,9 +65,7 @@
     </button>
 </div>
 
-{{-- ================================================================
-     CHECKOUT — active checkout bar, or check-out form
-     ================================================================ --}}
+{{-- Zaduženje drona (aktivno zaduženje ili obrazac) --}}
 @if($activeCheckout)
 <div class="db-checkout-active mb-4">
     <div class="db-checkout-icon">
@@ -117,9 +113,7 @@
 </div>
 @endif
 
-{{-- ================================================================
-     MAINTENANCE ALERTS
-     ================================================================ --}}
+{{-- Upozorenja o održavanju --}}
 <div class="db-card mb-4">
     <div class="db-card-header ph-collapsible">
         <div class="db-card-title">
@@ -146,9 +140,7 @@
     </div>
 </div>
 
-{{-- ================================================================
-     CAMERAS IN THE FIELD
-     ================================================================ --}}
+{{-- Kamere na terenu --}}
 <div class="db-card mb-4">
     <div class="db-card-header ph-collapsible">
         <div class="db-card-title">
@@ -187,9 +179,7 @@
     @endif
 </div>
 
-{{-- ================================================================
-     AI SURVEILLANCE RECOMMENDATION
-     ================================================================ --}}
+{{-- AI preporuka nadzora --}}
 <div class="db-card mb-4 ph-ai-card">
     <div class="db-card-header ph-collapsible">
         <div class="db-card-title">
@@ -232,9 +222,7 @@
     @endif
 </div>
 
-{{-- ================================================================
-     QUICK ACTIONS
-     ================================================================ --}}
+{{-- Brze radnje --}}
 <div class="ph-section-title mb-2">{{ __('ui.home.quick_actions') }}</div>
 <div class="ph-quick-grid mb-4">
     <a href="{{ route('maintenance.create') }}" class="ph-quick-tile">
@@ -247,9 +235,7 @@
     </a>
 </div>
 
-{{-- ================================================================
-     MONTH STATS
-     ================================================================ --}}
+{{-- Statistika za mjesec --}}
 <div class="ph-section-title mb-2">{{ __('ui.home.month_stats') }}</div>
 <div class="db-kpi-grid mb-4">
     <a href="{{ route('flights.index') }}" class="db-kpi-card db-kpi-blue">
@@ -275,9 +261,7 @@
     </a>
 </div>
 
-{{-- ================================================================
-     RECENT FLIGHTS
-     ================================================================ --}}
+{{-- Zadnji letovi --}}
 <div class="db-card">
     <div class="db-card-header ph-collapsible">
         <div class="db-card-title">{{ __('ui.home.recent_flights') }}</div>
@@ -343,7 +327,7 @@
 .leaflet-popup-content-wrapper { background: #0d2460 !important; color: #fff !important; border-radius: 10px !important; }
 .leaflet-popup-tip { background: #0d2460 !important; }
 
-/* ── Greeting + weather ──────────────────────────────────────── */
+/* Pozdrav i prognoza */
 .ph-header {
     display: flex;
     align-items: stretch;
@@ -382,7 +366,7 @@
 .ph-weather-red    .ph-weather-level { color: #f5a0a0; }
 .ph-weather-sub { font-size: 0.75rem; color: rgba(255,255,255,0.4); margin-top: 2px; }
 
-/* ── Checkout widget (shared with admin dashboard) ──────────────── */
+/* Zaduženje drona (isto kao na nadzornoj ploči) */
 .db-checkout-active {
     display: flex; align-items: center; gap: 1.2rem;
     background: linear-gradient(135deg, rgba(40,167,69,0.12), rgba(40,167,69,0.04));
@@ -414,7 +398,7 @@
 }
 .db-checkout-btn:hover { background: rgba(240,192,64,0.28); }
 
-/* ── Maintenance alert rows ──────────────────────────────────── */
+/* Upozorenja o održavanju */
 .ph-alert-row {
     display: flex; align-items: center; gap: 0.9rem;
     padding: 0.75rem 1.4rem;
@@ -429,10 +413,10 @@
 .ph-alert-desc { color: rgba(255,255,255,0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .db-empty-row { text-align: center; color: rgba(255,255,255,0.3); padding: 1.4rem !important; }
 
-/* ── Section title ───────────────────────────────────────────── */
+/* Naslov dijela */
 .ph-section-title { font-size: 0.82rem; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.6px; }
 
-/* ── Quick actions ───────────────────────────────────────────── */
+/* Brze radnje */
 .ph-quick-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -453,7 +437,7 @@
 }
 .ph-quick-label { font-size: 0.9rem; font-weight: 600; color: #fff; }
 
-/* ── AI assistant widget (top row, next to weather) ───────────── */
+/* AI asistent (gore, uz prognozu) */
 .ph-ai-widget {
     display: flex; align-items: center; gap: 0.9rem;
     background: linear-gradient(135deg, rgba(240,192,64,0.18), rgba(240,192,64,0.04));
@@ -470,11 +454,11 @@
 .ph-ai-widget-title { font-size: 0.95rem; font-weight: 700; color: #fff; }
 .ph-ai-widget-sub { font-size: 0.75rem; color: rgba(255,255,255,0.6); margin-top: 2px; line-height: 1.35; max-width: 260px; }
 
-/* ── KPI grid (month stats) ──────────────────────────────────── */
+/* Statistika za mjesec */
 .db-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 @media(max-width:768px) { .db-kpi-grid { grid-template-columns: 1fr; } }
 
-/* ── Flights table (shared with admin dashboard) ────────────── */
+/* Tablica letova (isto kao na nadzornoj ploči) */
 .db-flights-table-wrap { overflow-x: auto; }
 .db-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .db-table thead th {
@@ -496,7 +480,7 @@
 }
 .db-view-btn:hover { background: rgba(23,162,184,0.3); color: #fff; text-decoration: none; }
 
-/* ── Cameras / AI cards shared layout ─────────────────────────── */
+/* Zajednički izgled kartica kamera i AI */
 .ph-camera-layout {
     display: grid;
     grid-template-columns: 1fr 1.3fr;
@@ -533,7 +517,7 @@
 }
 @media(max-width:768px) { .ph-mini-map { margin: 0 1.4rem 1.1rem; } }
 
-/* ── Leaflet zoom control — match theme ───────────────────────── */
+/* Gumbi za zoom u boji teme */
 .leaflet-control-zoom {
     border: 1px solid rgba(255,255,255,0.15) !important;
     border-radius: 8px !important;
@@ -547,13 +531,13 @@
 }
 .leaflet-control-zoom a:hover { background: #1a3060 !important; color: var(--gold) !important; }
 
-/* ── Collapsible cards ─────────────────────────────────────────── */
+/* Kartice koje se mogu skupiti */
 .ph-collapsible { cursor: pointer; user-select: none; }
 .ph-card-toggle { color: rgba(255,255,255,0.35); font-size: 0.8rem; transition: transform .25s; flex-shrink: 0; }
 .db-card.ph-collapsed > *:not(.db-card-header) { display: none !important; }
 .db-card.ph-collapsed .ph-card-toggle { transform: rotate(-90deg); }
 
-/* ── AI card ───────────────────────────────────────────────────── */
+/* AI kartica */
 .ph-ai-card { border: 1px solid rgba(240,192,64,0.2); }
 .ph-ai-lists { padding: 0.6rem 0 0.8rem; }
 .ph-ai-list-title { padding: 0.4rem 1.4rem 0.3rem; font-size: 0.72rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -590,7 +574,7 @@ document.getElementById('phOpenAiChatFromRisk')?.addEventListener('click', funct
     document.getElementById('aiChatToggle')?.click();
 });
 
-// ── Collapsible cards ─────────────────────────────────────────────
+// Kartice koje se mogu skupiti
 const phMiniMaps = [];
 document.querySelectorAll('.ph-collapsible').forEach(header => {
     header.addEventListener('click', function (e) {
@@ -604,7 +588,7 @@ document.querySelectorAll('.ph-collapsible').forEach(header => {
 });
 
 @if($station && $station->latitude)
-// ── Cameras mini map ─────────────────────────────────────────────
+// Mala karta kamera
 @if($cameras->isNotEmpty())
 (function () {
     const map = L.map('camerasMiniMap', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })
@@ -639,7 +623,7 @@ document.querySelectorAll('.ph-collapsible').forEach(header => {
 })();
 @endif
 
-// ── AI risk mini map ─────────────────────────────────────────────
+// Mala karta rizika
 @if($aiSummary && !isset($aiSummary['message']) && (count($aiSummary['increase']) || count($aiSummary['decrease'])))
 (function () {
     const map = L.map('aiMiniMap', { zoomControl: true, attributionControl: false, scrollWheelZoom: false })

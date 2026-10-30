@@ -1,0 +1,12 @@
+{
+    "id": "T10",
+    "rep": 2,
+    "user": "ante.babic@mup.hr",
+    "query": "Tko je pobijedio na zadnjim parlamentarnim izborima u Hrvatskoj?",
+    "ran_at": "2026-10-26 20:07:39",
+    "seconds": 4.6,
+    "status": 200,
+    "tool_calls": [],
+    "tool_results": [],
+    "reply": "Nisam za to namijenjen — moja je uloga podrška nadzoru granice u sustavu SkyGuard (rizične zone, žarišta, statistika detekcija). Za politička pitanja provjeri druge izvore.\n\nMogu pomoći oko procjene rizika po zonama, rasporeda letova ili statistike detekcija."
+}

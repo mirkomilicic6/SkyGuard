@@ -33,7 +33,7 @@
                 </select>
             </div>
 
-            {{-- Admin filteri (samo super admin) --}}
+            {{-- Filteri (samo glavni administrator) --}}
             @if($administrations)
             <select name="administration_id" id="filter-admin" class="form-control form-control-sm">
                 <option value="">— Sve uprave —</option>
@@ -57,7 +57,7 @@
             </select>
             @endif
 
-            {{-- Postaja filter za admina cijele uprave --}}
+            {{-- Filter postaje za administratora uprave --}}
             @if($stations)
             <select name="station_id" class="form-control form-control-sm">
                 <option value="">— Sve postaje —</option>

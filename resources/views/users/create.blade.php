@@ -110,7 +110,7 @@ function populateStations(adminId, preselect) {
 
 adminSelect.addEventListener('change', () => populateStations(adminSelect.value, null));
 
-// Restore on validation error
+// vraćanje odabira ako spremanje nije uspjelo
 if (adminSelect.value) {
     populateStations(adminSelect.value, selectedStation);
 }

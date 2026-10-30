@@ -1,0 +1,19 @@
+{
+    "id": "T04",
+    "rep": 1,
+    "user": "damir.vukovic@mup.hr",
+    "query": "Koliko se mogu pouzdati u procjene rizika koje sustav daje?",
+    "ran_at": "2026-10-26 16:10:24",
+    "seconds": 13.6,
+    "status": 200,
+    "tool_calls": [
+        {
+            "name": "get_model_quality",
+            "input": []
+        }
+    ],
+    "tool_results": [
+        "{\"najbolji_model\":\"random_forest\",\"kriterij_odabira\":\"najve\\u0107i F1 na testnom skupu\",\"testno_razdoblje_od\":\"2026-07-27\",\"broj_primjera\":2016,\"udio_pozitivnih\":0.043,\"broj_zona\":1,\"nasumicni_odabir_top5_zona\":1,\"nasumicni_odabir_top10_zona\":1,\"napomena\":\"Prosje\\u010dna preciznost nasumi\\u010dnog modela pribli\\u017eno je jednaka udjelu pozitivnih primjera. Pokrivenost top-K zona usporedi s nasumi\\u010dnim odabirom; ako zona ima K ili manje, pokrivenost je trivijalno 1 i ni\\u0161ta ne govori o modelu.\",\"modeli\":{\"logistic_regression\":{\"naziv\":\"Logistic Regression\",\"f1\":0,\"precision\":0,\"recall\":0,\"roc_auc\":0.513,\"average_precision\":0.066,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1},\"knn\":{\"naziv\":\"k-Nearest Neighbors\",\"f1\":0.028,\"precision\":0.019,\"recall\":0.053,\"roc_auc\":0.438,\"average_precision\":0.059,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1},\"random_forest\":{\"naziv\":\"Random Forest\",\"f1\":0.065,\"precision\":0.047,\"recall\":0.105,\"roc_auc\":0.562,\"average_precision\":0.068,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1},\"gradient_boosting\":{\"naziv\":\"Gradient Boosting\",\"f1\":0,\"precision\":0,\"recall\":0,\"roc_auc\":0.481,\"average_precision\":0.051,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1}}}"
+    ],
+    "reply": "Procjene treba uzeti vrlo oprezno – trenutno su slabo pouzdane.\n\n**Zašto:**\n- Najbolji model (Random Forest) ima vrlo niske mjere: F1 = 0,065, ROC-AUC = 0,562 (jedva bolje od nasumičnog pogađanja, gdje je 0,5).\n- Prosječna preciznost (0,068) tek je neznatno viša od udjela pozitivnih primjera (4,3%), što znači da model jedva nadmašuje slučajno pogađanje.\n- Postoji **samo 1 zona** u evaluaciji, pa je \"pokrivenost top-5\/top-10 zona = 1\" trivijalna i ne govori ništa o kvaliteti modela.\n- Detekcije su rijetke (samo 4,3% pozitivnih od 2016 primjera), što otežava učenje.\n\n**Zaključak:** Indekse rizika koristi za grubo rangiranje i kao dopunu, ali ne kao pouzdan temelj za odluke. Vlastita procjena, terensko znanje i ostali izvori i dalje su primarni. Pouzdanost bi se poboljšala s više prikupljenih podataka i više izdvojenih žarišta."
+}

@@ -89,7 +89,7 @@ class MaintenanceController extends Controller
         $this->authorizeAccess($maintenance);
         $user = auth()->user();
 
-        // Pilot can only edit their own pending_review logs
+        // pilot može uređivati samo svoje prijave koje još čekaju pregled
         if ($user->hasRole('pilot')) {
             if ($maintenance->reported_by !== $user->id || !$maintenance->isPendingReview()) {
                 abort(403, __('ui.maintenance.pilot_edit_denied'));
@@ -156,7 +156,7 @@ class MaintenanceController extends Controller
         return redirect()->route('maintenance.index')->with('success', __('ui.maintenance.deleted'));
     }
 
-    // ── Workflow actions (admin only) ─────────────────────────────────────────
+    // Obrada prijava kvarova (samo administrator)
 
     public function accept(MaintenanceLog $maintenance)
     {
@@ -212,7 +212,7 @@ class MaintenanceController extends Controller
         return back()->with('success', __('ui.maintenance.resolved'));
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // Pomoćne funkcije
 
     private function denyNonAdmin(): void
     {
@@ -229,7 +229,7 @@ class MaintenanceController extends Controller
             return $this->applyStationScope(MaintenanceLog::query());
         }
 
-        // Pilot sees logs they reported + logs for their assigned drones
+        // pilot vidi svoje prijave i prijave za dronove koji su mu dodijeljeni
         $droneIds = $user->drones->pluck('id');
         return MaintenanceLog::where('reported_by', $user->id)
             ->orWhereIn('drone_id', $droneIds);

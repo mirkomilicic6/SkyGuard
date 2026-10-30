@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
 
 class BorderFlightSeeder extends Seeder
 {
-    // Border patrol areas along Bosnia-Croatia border (Velika Kladuša / Bihać corridor)
+    // područja nadzora uz granicu s BiH (Velika Kladuša, Bihać)
     private array $areas = [
         ['lat' => 45.170, 'lon' => 15.785, 'name' => 'Maljevac – Velika Kladuša'],
         ['lat' => 45.140, 'lon' => 15.745, 'name' => 'Šturlić crossing'],
@@ -26,55 +26,55 @@ class BorderFlightSeeder extends Seeder
         ['lat' => 44.875, 'lon' => 15.875, 'name' => 'South Bihać corridor'],
     ];
 
-    // 50 pre-defined detection hotspots along the border
+    // 50 unaprijed zadanih žarišta uz granicu
     private array $hotspots = [
         ['lat' => 45.1715, 'lon' => 15.7820, 'types' => ['person', 'group']],
-        ['lat' => 45.1680, 'lon' => 15.7905, 'types' => ['person', 'smuggling']],
+        ['lat' => 45.1680, 'lon' => 15.7905, 'types' => ['person']],
         ['lat' => 45.1650, 'lon' => 15.7760, 'types' => ['group', 'vehicle']],
         ['lat' => 45.1590, 'lon' => 15.7840, 'types' => ['person']],
-        ['lat' => 45.1530, 'lon' => 15.7680, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 45.1530, 'lon' => 15.7680, 'types' => ['vehicle']],
         ['lat' => 45.1490, 'lon' => 15.7720, 'types' => ['person', 'group']],
         ['lat' => 45.1440, 'lon' => 15.7500, 'types' => ['person']],
-        ['lat' => 45.1410, 'lon' => 15.7580, 'types' => ['smuggling', 'vehicle']],
+        ['lat' => 45.1410, 'lon' => 15.7580, 'types' => ['vehicle']],
         ['lat' => 45.1370, 'lon' => 15.7430, 'types' => ['group']],
         ['lat' => 45.1310, 'lon' => 15.7360, 'types' => ['person', 'other']],
         ['lat' => 45.1265, 'lon' => 15.7280, 'types' => ['vehicle']],
         ['lat' => 45.1220, 'lon' => 15.7150, 'types' => ['person', 'group']],
         ['lat' => 45.1190, 'lon' => 15.7060, 'types' => ['person']],
-        ['lat' => 45.1140, 'lon' => 15.7090, 'types' => ['smuggling']],
+        ['lat' => 45.1140, 'lon' => 15.7090, 'types' => ['other']],
         ['lat' => 45.1095, 'lon' => 15.7180, 'types' => ['group', 'person']],
-        ['lat' => 45.1040, 'lon' => 15.7240, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 45.1040, 'lon' => 15.7240, 'types' => ['vehicle']],
         ['lat' => 45.0980, 'lon' => 15.7290, 'types' => ['person']],
         ['lat' => 45.0920, 'lon' => 15.7400, 'types' => ['group']],
         ['lat' => 45.0870, 'lon' => 15.7480, 'types' => ['person', 'vehicle']],
-        ['lat' => 45.0820, 'lon' => 15.7560, 'types' => ['smuggling']],
+        ['lat' => 45.0820, 'lon' => 15.7560, 'types' => ['other']],
         ['lat' => 45.0770, 'lon' => 15.7620, 'types' => ['person', 'group']],
         ['lat' => 45.0710, 'lon' => 15.7680, 'types' => ['person']],
         ['lat' => 45.0660, 'lon' => 15.7750, 'types' => ['vehicle']],
-        ['lat' => 45.0600, 'lon' => 15.7790, 'types' => ['group', 'smuggling']],
+        ['lat' => 45.0600, 'lon' => 15.7790, 'types' => ['group']],
         ['lat' => 45.0540, 'lon' => 15.7840, 'types' => ['person']],
         ['lat' => 45.0480, 'lon' => 15.7880, 'types' => ['person', 'other']],
         ['lat' => 45.0420, 'lon' => 15.7920, 'types' => ['group']],
-        ['lat' => 45.0360, 'lon' => 15.7970, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 45.0360, 'lon' => 15.7970, 'types' => ['vehicle']],
         ['lat' => 45.0290, 'lon' => 15.8010, 'types' => ['person']],
         ['lat' => 45.0230, 'lon' => 15.8050, 'types' => ['group', 'person']],
-        ['lat' => 45.0170, 'lon' => 15.8100, 'types' => ['smuggling']],
+        ['lat' => 45.0170, 'lon' => 15.8100, 'types' => ['other']],
         ['lat' => 45.0110, 'lon' => 15.8150, 'types' => ['person', 'vehicle']],
         ['lat' => 45.0040, 'lon' => 15.8190, 'types' => ['group']],
         ['lat' => 44.9970, 'lon' => 15.8230, 'types' => ['person']],
-        ['lat' => 44.9900, 'lon' => 15.8270, 'types' => ['smuggling', 'vehicle']],
+        ['lat' => 44.9900, 'lon' => 15.8270, 'types' => ['vehicle']],
         ['lat' => 44.9830, 'lon' => 15.8310, 'types' => ['person', 'group']],
         ['lat' => 44.9760, 'lon' => 15.8360, 'types' => ['person']],
         ['lat' => 44.9690, 'lon' => 15.8400, 'types' => ['other']],
-        ['lat' => 44.9620, 'lon' => 15.8440, 'types' => ['vehicle', 'smuggling']],
+        ['lat' => 44.9620, 'lon' => 15.8440, 'types' => ['vehicle']],
         ['lat' => 44.9550, 'lon' => 15.8470, 'types' => ['person', 'group']],
         ['lat' => 44.9480, 'lon' => 15.8510, 'types' => ['person']],
         ['lat' => 44.9410, 'lon' => 15.8545, 'types' => ['group']],
-        ['lat' => 44.9330, 'lon' => 15.8580, 'types' => ['smuggling']],
+        ['lat' => 44.9330, 'lon' => 15.8580, 'types' => ['other']],
         ['lat' => 44.9250, 'lon' => 15.8610, 'types' => ['person', 'vehicle']],
         ['lat' => 44.9170, 'lon' => 15.8640, 'types' => ['group', 'person']],
         ['lat' => 44.9090, 'lon' => 15.8670, 'types' => ['person']],
-        ['lat' => 44.9010, 'lon' => 15.8700, 'types' => ['smuggling', 'other']],
+        ['lat' => 44.9010, 'lon' => 15.8700, 'types' => ['other']],
         ['lat' => 44.8930, 'lon' => 15.8730, 'types' => ['vehicle']],
         ['lat' => 44.8840, 'lon' => 15.8755, 'types' => ['person', 'group']],
         ['lat' => 44.8760, 'lon' => 15.8780, 'types' => ['person']],
@@ -149,7 +149,7 @@ class BorderFlightSeeder extends Seeder
 
             GpxPoint::insert($rows);
 
-            // Add 0-3 detections near hotspots that fall within flight bounding box
+            // 0 do 3 detekcije uz žarišta koja su u području leta
             $this->seedDetections($flight, $points, $pilot->id, $flightDate);
 
             $this->command->getOutput()->write('.');
@@ -176,7 +176,7 @@ class BorderFlightSeeder extends Seeder
 
         if (empty($nearby)) return;
 
-        // Pick 0–3 hotspots randomly (weighted: 60% chance of at least one)
+        // nasumično 0 do 3 žarišta (60 % šanse za barem jedno)
         if (rand(1, 100) > 60) return;
 
         $count = rand(1, min(3, count($nearby)));
@@ -188,19 +188,21 @@ class BorderFlightSeeder extends Seeder
             $hotspot = $nearbyValues[$idx];
             $type    = $hotspot['types'][array_rand($hotspot['types'])];
 
-            // Small jitter so repeat sightings at same hotspot don't stack exactly
+            // malo odstupanje da se detekcije na istom žarištu ne preklapaju
             $lat = $hotspot['lat'] + (rand(-50, 50) / 100000);
             $lon = $hotspot['lon'] + (rand(-50, 50) / 100000);
 
             Detection::create([
-                'flight_id'   => $flight->id,
-                'user_id'     => $userId,
-                'latitude'    => round($lat, 7),
-                'longitude'   => round($lon, 7),
-                'type'        => $type,
-                'count'       => $this->randomCount($type),
-                'notes'       => $this->randomNote($type),
-                'detected_at' => $flightDate->copy()->addMinutes(rand(5, 25)),
+                'flight_id'      => $flight->id,
+                'station_id'     => $flight->station_id,
+                'created_by'     => $userId,
+                'source'         => 'drone',
+                'latitude'       => round($lat, 7),
+                'longitude'      => round($lon, 7),
+                'detection_type' => $type,
+                'entity_count'   => $this->randomCount($type),
+                'note'           => $this->randomNote($type),
+                'detected_at'    => $flightDate->copy()->addMinutes(rand(5, 25)),
             ]);
         }
     }
@@ -208,42 +210,40 @@ class BorderFlightSeeder extends Seeder
     private function randomCount(string $type): int
     {
         return match($type) {
-            'person'    => rand(1, 3),
-            'group'     => rand(4, 15),
-            'vehicle'   => rand(1, 3),
-            'smuggling' => rand(1, 4),
-            default     => 1,
+            'person'  => rand(1, 3),
+            'group'   => rand(4, 15),
+            'vehicle' => rand(1, 3),
+            default   => 1,
         };
     }
 
     private function randomNote(string $type): ?string
     {
         $notes = match($type) {
-            'person'    => ['Moving north on foot', 'Hiding in tree line', 'Crossed river', null, null],
-            'group'     => ['Large group, mixed ages', 'Moving fast towards road', 'Camped near forest edge', null],
-            'vehicle'   => ['Dark SUV without plates', 'Van parked off-road', 'Moving lights at night', null, null],
-            'smuggling' => ['Backpacks visible', 'Drop point near fence', 'Suspected goods transfer', null],
-            default     => [null, null, 'Unidentified activity'],
+            'person'  => ['Moving north on foot', 'Hiding in tree line', 'Crossed river', null, null],
+            'group'   => ['Large group, mixed ages', 'Moving fast towards road', 'Camped near forest edge', null],
+            'vehicle' => ['Dark SUV without plates', 'Van parked off-road', 'Moving lights at night', null, null],
+            default   => [null, null, 'Unidentified activity'],
         };
         return $notes[array_rand($notes)];
     }
 
     private function generateBorderPatrol(array $center, Carbon $startTime): array
     {
-        // Border patrols follow the border line (roughly NW-SE), so corridor pattern
+        // let prati granicu (otprilike sjeverozapad-jugoistok)
         $pointCount = rand(40, 70);
         $interval   = rand(8, 14);
 
-        // Random bearing along the border (roughly 135-165 degrees = SE, or reverse)
+        // nasumični smjer uz granicu (oko 135-165 stupnjeva ili obrnuto)
         $bearing  = rand(0, 1) ? rand(130, 165) : rand(310, 345);
         $rad      = deg2rad($bearing);
-        $dist     = 0.020 + lcg_value() * 0.030; // longer corridor for border patrol
+        $dist     = 0.020 + lcg_value() * 0.030; // dulji pojas leta uz granicu
         $offset   = 0.0005;
 
         $endLat = $center['lat'] + $dist * cos($rad);
         $endLon = $center['lon'] + $dist * sin($rad);
 
-        // Back-and-forth sweep
+        // let tamo-amo
         $waypoints = [
             [$center['lat'],           $center['lon']          ],
             [$endLat,                  $endLon                 ],
@@ -266,7 +266,7 @@ class BorderFlightSeeder extends Seeder
         $time = $start->copy();
         $prev = null;
 
-        // Takeoff climb
+        // polijetanje
         $firstWp = $waypoints[0];
         for ($i = 0; $i < $climbPoints; $i++) {
             $frac   = $i / $climbPoints;
@@ -274,7 +274,7 @@ class BorderFlightSeeder extends Seeder
             $time->addSeconds($interval);
         }
 
-        // Cruise
+        // let
         for ($w = 0; $w < count($waypoints) - 1; $w++) {
             $a = $waypoints[$w];
             $b = $waypoints[$w + 1];
@@ -294,7 +294,7 @@ class BorderFlightSeeder extends Seeder
             }
         }
 
-        // Descent
+        // spuštanje
         $lastWp = $waypoints[count($waypoints) - 1];
         for ($i = $descentPoints; $i >= 0; $i--) {
             $frac   = $i / $descentPoints;

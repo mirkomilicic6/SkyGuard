@@ -11,7 +11,7 @@ use Illuminate\Database\Seeder;
 
 class FlightSeeder extends Seeder
 {
-    // Centres around which flights are generated (varied areas for a rich heatmap)
+    // središta oko kojih se generiraju letovi
     private array $areas = [
         ['lat' => 45.8000, 'lon' => 15.9000],
         ['lat' => 45.8100, 'lon' => 15.8850],
@@ -122,7 +122,7 @@ class FlightSeeder extends Seeder
 
             $flightDate = $start->copy()->addSeconds(rand(0, $range));
 
-            // Generate GPX points
+            // GPS točke
             $points   = $this->generatePoints($area, $flightDate);
             $stats    = $this->calculateStats($points);
 
@@ -162,9 +162,9 @@ class FlightSeeder extends Seeder
 
     private function generatePoints(array $center, Carbon $startTime): array
     {
-        $pattern = rand(0, 2); // 0 = rectangular, 1 = circular, 2 = corridor
+        $pattern = rand(0, 2); // 0 = pravokutno, 1 = kružno, 2 = pojas
         $pointCount = rand(30, 60);
-        $interval   = rand(8, 15); // seconds between points
+        $interval   = rand(8, 15); // sekundi između točaka
 
         return match ($pattern) {
             0 => $this->rectangularPath($center, $startTime, $pointCount, $interval),
@@ -240,14 +240,14 @@ class FlightSeeder extends Seeder
         $descentPoints = 5;
         $cruisePoints  = $n - $climbPoints - $descentPoints;
 
-        // Distribute cruise points evenly across waypoint segments
+        // točke leta ravnomjerno po dionicama
         $cruisePerSeg = max(1, intdiv($cruisePoints, max(1, count($waypoints) - 1)));
 
         $path = [];
         $time = $start->copy();
         $prev = null;
 
-        // Takeoff climb
+        // polijetanje
         $firstWp = $waypoints[0];
         for ($i = 0; $i < $climbPoints; $i++) {
             $frac = $i / $climbPoints;
@@ -256,7 +256,7 @@ class FlightSeeder extends Seeder
             $time->addSeconds($interval);
         }
 
-        // Cruise between waypoints
+        // let između točaka
         for ($w = 0; $w < count($waypoints) - 1; $w++) {
             $a = $waypoints[$w];
             $b = $waypoints[$w + 1];
@@ -264,7 +264,7 @@ class FlightSeeder extends Seeder
                 $frac = ($cruisePerSeg > 1) ? $s / ($cruisePerSeg - 1) : 0;
                 $lat  = $a[0] + ($b[0] - $a[0]) * $frac;
                 $lon  = $a[1] + ($b[1] - $a[1]) * $frac;
-                // Small natural wobble
+                // malo odstupanje
                 $lat += (lcg_value() - 0.5) * 0.0002;
                 $lon += (lcg_value() - 0.5) * 0.0002;
                 $alt  = round($cruiseAlt + (lcg_value() - 0.5) * 10, 1);
@@ -279,7 +279,7 @@ class FlightSeeder extends Seeder
             }
         }
 
-        // Descent and landing
+        // spuštanje i slijetanje
         $lastWp = $waypoints[count($waypoints) - 1];
         for ($i = $descentPoints; $i >= 0; $i--) {
             $frac = $i / $descentPoints;
@@ -288,7 +288,7 @@ class FlightSeeder extends Seeder
             $time->addSeconds($interval);
         }
 
-        // Fill first point speed
+        // brzina prve točke
         if (count($path) > 1 && $path[0]['speed'] === null) {
             $path[0]['speed'] = $path[1]['speed'] ?? 0;
         }

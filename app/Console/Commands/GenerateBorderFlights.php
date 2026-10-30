@@ -15,7 +15,7 @@ class GenerateBorderFlights extends Command
 
     protected $description = 'Generate realistic patrol flights (with GPX tracks) anchored to the Croatian side of the real HR-BiH/HR-Srbija border, per station';
 
-    /** Approximate real-world coordinates for each border police station town. */
+    // Približne koordinate mjesta u kojima su postaje
     private const STATION_COORDS = [
         'PGP Slunj' => [45.1122, 15.5828],
         'PGP Cetingrad' => [45.0333, 15.7500],
@@ -106,10 +106,7 @@ class GenerateBorderFlights extends Command
         $this->segments = [$data['hr_bih_main'], $data['hr_bih_south'], $data['hr_srb']];
     }
 
-    /**
-     * Find the nearest point across all border segments to the given coordinate,
-     * plus a local tangent direction (unit vector [dLat, dLon]) at that point.
-     */
+    // Najbliža točka na granici i smjer granice u toj točki
     private function nearestBorderPoint(float $lat, float $lon): array
     {
         $best = null;
@@ -136,7 +133,7 @@ class GenerateBorderFlights extends Command
         return [$best['lat'], $best['lon'], $best['tangent']];
     }
 
-    /** Unit normal to the tangent, pointing toward the station coordinate (i.e. into Croatia). */
+    // Smjer okomit na granicu, prema postaji, odnosno prema unutrašnjosti Hrvatske
     private function inwardNormal(float $borderLat, float $borderLon, array $tangent, float $stationLat, float $stationLon): array
     {
         $n1 = [-$tangent[1], $tangent[0]];
@@ -157,10 +154,9 @@ class GenerateBorderFlights extends Command
         return sqrt($dx ** 2 + $dy ** 2);
     }
 
-    /** @return array{0: Flight, 1: array<int, array>} */
     private function buildFlight(BorderPoliceStation $station, int $pilotId, int $droneId, float $borderLat, float $borderLon, array $tangent, array $normal): array
     {
-        $offsetKm = mt_rand(150, 350) / 100;      // 1.5–3.5 km inland from the border line
+        $offsetKm = mt_rand(150, 350) / 100;      // 1,5 do 3,5 km od granice prema unutrašnjosti
         $jitterKm = 0.15;
         $jitterCycles = mt_rand(3, 6);
         $jitterPhase = mt_rand(0, 628) / 100;
@@ -172,9 +168,7 @@ class GenerateBorderFlights extends Command
         $durationMinutes = mt_rand(15, 45);
         $flightDate = now()->subDays(mt_rand(0, 89))->subMinutes(mt_rand(0, 1439));
 
-        // Pick a target distance from a realistic patrol speed, then size the
-        // back-and-forth sweep so the generated path actually covers it
-        // (accounting for the extra arc length the smooth jitter adds).
+        // duljina leta prema realnoj brzini letjelice, a putanja se tome prilagođava
         $targetAvgSpeed = mt_rand(18, 35);
         $targetDistanceKm = $targetAvgSpeed * $durationMinutes / 60;
         $cycles = mt_rand(2, 4);
@@ -188,7 +182,7 @@ class GenerateBorderFlights extends Command
 
         for ($i = 0; $i < $numPoints; $i++) {
             $t = $i / max(1, $numPoints - 1);
-            // back-and-forth patrol sweep along the tangent, smooth perpendicular jitter, always offset inward
+            // let tamo-amo uz granicu, s malim odstupanjima, uvijek s hrvatske strane
             $sweep = sin($t * M_PI * $cycles) * ($lengthKm / 2);
             $jitter = sin($t * 2 * M_PI * $jitterCycles + $jitterPhase) * $jitterKm;
 

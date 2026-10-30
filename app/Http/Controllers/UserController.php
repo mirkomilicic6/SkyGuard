@@ -96,7 +96,7 @@ class UserController extends Controller
         $authUser = auth()->user();
 
         if ($authUser->hasRole('pilot')) {
-            // Pilot can only see other pilots from same station
+            // pilot vidi samo pilote svoje postaje
             if (!$user->hasRole('pilot') || $user->station_id !== $authUser->station_id) {
                 abort(403);
             }

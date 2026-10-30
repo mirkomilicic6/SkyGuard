@@ -7,7 +7,7 @@
 
 @section('content')
 
-{{-- ── KPI cards ─────────────────────────────────────────────────────────── --}}
+{{-- Osnovni pokazatelji --}}
 <div class="an-kpi-grid mb-4">
 
     <div class="db-kpi-card db-kpi-gold">
@@ -19,62 +19,134 @@
         </div>
     </div>
 
-    <div class="db-kpi-card db-kpi-green">
-        <div class="db-kpi-icon"><i class="fas fa-check-circle"></i></div>
+    <div class="db-kpi-card db-kpi-purple">
+        <div class="db-kpi-icon"><i class="fas fa-users"></i></div>
         <div class="db-kpi-body">
-            <div class="db-kpi-value">{{ $confirmed }}</div>
-            <div class="db-kpi-label">Potvrđeno</div>
+            <div class="db-kpi-value">{{ $totalEntities }}</div>
+            <div class="db-kpi-label">Ukupno entiteta</div>
+            <div class="db-kpi-sub">osoba, vozila, skupina</div>
+        </div>
+    </div>
+
+    <div class="db-kpi-card db-kpi-green">
+        <div class="db-kpi-icon"><i class="fas fa-helicopter"></i></div>
+        <div class="db-kpi-body">
+            <div class="db-kpi-value">{{ $totalFlights }}</div>
+            <div class="db-kpi-label">Ukupno letova</div>
             <div class="db-kpi-sub">
-                {{ $total > 0 ? round($confirmed / $total * 100) : 0 }}% od ukupnih
+                {{ $flightsWithDetections }} s detekcijom · {{ $flightsWithoutDetections }} bez
             </div>
         </div>
     </div>
 
     <div class="db-kpi-card db-kpi-red">
-        <div class="db-kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="db-kpi-icon"><i class="fas fa-clock"></i></div>
         <div class="db-kpi-body">
-            @php $highRisk = ($chartEscalation['data'][3] ?? 0) + ($chartEscalation['data'][2] ?? 0); @endphp
-            <div class="db-kpi-value">{{ $highRisk }}</div>
-            <div class="db-kpi-label">Visoki rizik</div>
-            <div class="db-kpi-sub">kritično + intervencija</div>
-        </div>
-    </div>
-
-    <div class="db-kpi-card db-kpi-purple">
-        <div class="db-kpi-icon"><i class="fas fa-users"></i></div>
-        <div class="db-kpi-body">
-            @php $people = ($chartType['data'][0] ?? 0) + ($chartType['data'][1] ?? 0); @endphp
-            <div class="db-kpi-value">{{ $people }}</div>
-            <div class="db-kpi-label">Osobe / Grupe</div>
-            <div class="db-kpi-sub">zabilježenih osoba</div>
+            <div class="db-kpi-value">{{ $totalHours }}</div>
+            <div class="db-kpi-label">Sati nadzora</div>
+            <div class="db-kpi-sub">{{ $avgDetectionsPerFlightHour }} detekcija/h leta</div>
         </div>
     </div>
 
 </div>
 
-{{-- ── Heatmap ───────────────────────────────────────────────────────────── --}}
+{{-- Prostorna gustoća (toplinska karta, detekcije, putanje letova, granice) --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
             <div class="db-card-title">
-                <i class="fas fa-fire mr-2" style="color:#f46d43"></i>Heatmapa detekcija
+                <i class="fas fa-fire mr-2" style="color:#f46d43"></i>Prostorna gustoća detekcija
             </div>
-            <div class="db-card-subtitle">{{ count($heatmap) }} GPS točaka</div>
+            <div class="db-card-subtitle" id="spFilteredCount">Učitavanje...</div>
         </div>
     </div>
-    <div style="position:relative">
-        @if(count($heatmap) > 0)
-            <div id="heatmap" style="height:420px; border-radius:0 0 12px 12px;"></div>
-        @else
-            <div class="an-empty-map">
-                <i class="fas fa-map-marked-alt"></i>
-                <div>Nema GPS podataka za prikaz</div>
-            </div>
+
+    {{-- Filteri --}}
+    <div class="sp-filters">
+        @if($administrations)
+        <select id="spAdministration" class="form-control form-control-sm">
+            <option value="">— Sva uprava —</option>
+            @foreach($administrations as $adm)
+                <option value="{{ $adm->id }}"
+                    data-stations="{{ $adm->stations->map(fn($s)=>['id'=>$s->id,'name'=>$s->name])->toJson() }}">
+                    {{ $adm->name }}
+                </option>
+            @endforeach
+        </select>
+        <select id="spStation" class="form-control form-control-sm">
+            <option value="">— Sve postaje —</option>
+            @foreach($administrations->flatMap->stations as $st)
+                <option value="{{ $st->id }}" data-admin="{{ $st->police_administration_id }}">{{ $st->name }}</option>
+            @endforeach
+        </select>
+        @elseif($stations)
+        <select id="spStation" class="form-control form-control-sm">
+            <option value="">— Sve postaje —</option>
+            @foreach($stations as $st)
+                <option value="{{ $st->id }}">{{ $st->name }}</option>
+            @endforeach
+        </select>
         @endif
+
+        <input type="date" id="spDateFrom" class="form-control form-control-sm" title="Datum od">
+        <input type="date" id="spDateTo" class="form-control form-control-sm" title="Datum do">
+
+        <select id="spType" class="form-control form-control-sm">
+            <option value="">— Sve vrste —</option>
+            <option value="person">Osoba</option>
+            <option value="group">Grupa</option>
+            <option value="vehicle">Vozilo</option>
+            <option value="other">Ostalo</option>
+        </select>
+
+        <select id="spSource" class="form-control form-control-sm">
+            <option value="">— Svi izvori —</option>
+            <option value="drone">Dron</option>
+            <option value="trail_camera">Kamera</option>
+            <option value="ground_observation">Ručno (teren)</option>
+            <option value="other">Ostalo</option>
+        </select>
+
+        <select id="spTimeBlock" class="form-control form-control-sm">
+            <option value="">— Cijeli dan —</option>
+            @foreach($timeBlocks as $i => $block)
+                <option value="{{ $i }}">{{ $block['label'] }}</option>
+            @endforeach
+        </select>
+
+        <button id="spApply" class="btn btn-sm btn-primary"><i class="fas fa-filter mr-1"></i>Primijeni</button>
+        <button id="spReset" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></button>
+    </div>
+
+    {{-- Uključivanje slojeva i postavke toplinske karte --}}
+    <div class="sp-controls">
+        <div class="sp-layers">
+            <label><input type="checkbox" id="layerHeat" checked> Heatmapa</label>
+            <label><input type="checkbox" id="layerPoints"> Pojedinačne detekcije</label>
+            <label><input type="checkbox" id="layerRoutes"> GPX rute</label>
+            <label><input type="checkbox" id="layerZones"> Granice postaja</label>
+        </div>
+        <div class="sp-params">
+            <label>Radius <input type="number" id="paramRadius" value="35" min="5" max="100" class="form-control form-control-sm"></label>
+            <label>Blur <input type="number" id="paramBlur" value="25" min="0" max="100" class="form-control form-control-sm"></label>
+            <label>Maks. intenzitet <input type="number" id="paramMax" value="1" min="1" step="0.5" class="form-control form-control-sm"></label>
+            <label class="sp-check"><input type="checkbox" id="paramWeightByEntities"> Ponderiraj prema broju entiteta</label>
+        </div>
+    </div>
+
+    <div style="position:relative">
+        <div id="spatialMap" style="height:480px; border-radius:0 0 12px 12px;"></div>
+    </div>
+
+    {{-- Legenda --}}
+    <div class="sp-legend">
+        <span>Niska gustoća</span>
+        <div class="sp-legend-bar"></div>
+        <span>Visoka gustoća</span>
     </div>
 </div>
 
-{{-- ── Charts row 1: type + hour ────────────────────────────────────────── --}}
+{{-- Grafovi: vrsta i sat --}}
 <div class="row mb-4">
     <div class="col-md-5">
         <div class="db-card h-100">
@@ -98,7 +170,7 @@
     </div>
 </div>
 
-{{-- ── Charts row 2: weekday + monthly trend ───────────────────────────── --}}
+{{-- Grafovi: dan u tjednu i kretanje po mjesecima --}}
 <div class="row mb-4">
     <div class="col-md-5">
         <div class="db-card h-100">
@@ -122,39 +194,25 @@
     </div>
 </div>
 
-{{-- ── Escalation ────────────────────────────────────────────────────────── --}}
+{{-- Grafovi: izvor i postaja --}}
 <div class="row mb-4">
     <div class="col-md-5">
         <div class="db-card">
             <div class="db-card-header">
-                <div class="db-card-title"><i class="fas fa-exclamation-circle mr-2" style="color:#fd7e14"></i>Razine eskalacije</div>
+                <div class="db-card-title"><i class="fas fa-satellite-dish mr-2" style="color:var(--gold)"></i>Po izvoru</div>
             </div>
             <div class="db-card-body">
-                <canvas id="chartEscalation" height="240"></canvas>
+                <canvas id="chartSource" height="240"></canvas>
             </div>
         </div>
     </div>
     <div class="col-md-7">
         <div class="db-card">
             <div class="db-card-header">
-                <div class="db-card-title"><i class="fas fa-list mr-2" style="color:var(--gold)"></i>Pregled po eskalaciji</div>
+                <div class="db-card-title"><i class="fas fa-building-shield mr-2" style="color:var(--gold)"></i>Po policijskoj postaji</div>
             </div>
-            <div class="db-card-body p-0">
-                @php
-                    $escLabels = [0 => 'Informativno', 1 => 'Upozorenje', 2 => 'Intervencija', 3 => 'Kritično'];
-                    $escColors = [0 => '#6c757d',      1 => '#f0c040',    2 => '#fd7e14',      3 => '#dc3545'];
-                @endphp
-                @foreach($escLabels as $level => $label)
-                <div class="db-stat-row" style="{{ $level === 3 ? 'border:none' : '' }}">
-                    <div class="db-stat-icon" style="background:{{ $escColors[$level] }}22;color:{{ $escColors[$level] }}">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                    <span>{{ $label }}</span>
-                    <strong class="ml-auto" style="color:{{ $escColors[$level] }}">
-                        {{ $chartEscalation['data'][$level] ?? 0 }}
-                    </strong>
-                </div>
-                @endforeach
+            <div class="db-card-body">
+                <canvas id="chartStation" height="200"></canvas>
             </div>
         </div>
     </div>
@@ -187,6 +245,35 @@
     gap: 0.75rem;
 }
 .an-empty-map div { font-size: 0.9rem; }
+
+.sp-filters, .sp-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    padding: .6rem 1.2rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.sp-filters select, .sp-filters input { width: auto; }
+.sp-controls { justify-content: space-between; background: rgba(255,255,255,0.02); }
+.sp-layers, .sp-params { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.sp-layers label, .sp-params label {
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .8rem; color: rgba(255,255,255,0.6); margin: 0;
+}
+.sp-params input[type="number"] { width: 70px; display: inline-block; }
+.sp-check { white-space: nowrap; }
+
+.sp-legend {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .6rem 1.2rem;
+    font-size: .75rem; color: rgba(255,255,255,0.5);
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.sp-legend-bar {
+    flex: 1; max-width: 260px; height: 10px; border-radius: 5px;
+    background: linear-gradient(to right, #4575b4, #74add1, #fdae61, #f46d43, #d73027);
+}
 </style>
 @endsection
 
@@ -195,22 +282,172 @@
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
-// ── Heatmap ──────────────────────────────────────────────────────────────────
-@if(count($heatmap) > 0)
-const heatPoints = {!! json_encode($heatmap) !!};
-const map = L.map('heatmap').setView([45.1, 18.5], 9);
+// Karta prostorne gustoće
+const spatialMap = L.map('spatialMap').setView([45.1, 18.0], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
-}).addTo(map);
-L.heatLayer(heatPoints, {
-    radius: 22, blur: 18, maxZoom: 14, max: 1.0,
-    gradient: { 0.2:'#4575b4', 0.45:'#74add1', 0.65:'#fdae61', 0.82:'#f46d43', 1.0:'#d73027' }
-}).addTo(map);
-const coords = heatPoints.map(p => [p[0], p[1]]);
-map.fitBounds(L.latLngBounds(coords).pad(0.1));
-@endif
+}).addTo(spatialMap);
 
-// ── Chart defaults ───────────────────────────────────────────────────────────
+let spData = { points: [], routes: [], zones: [] };
+let heatLayer = null;
+const layerPointsGroup = L.layerGroup();
+const layerRoutesGroup = L.layerGroup();
+const layerZonesGroup  = L.layerGroup();
+
+const spTypeColors = { person: '#fd7e14', group: '#dc3545', vehicle: '#0d6efd', other: '#6c757d' };
+
+function spWeight(p) {
+    return document.getElementById('paramWeightByEntities').checked ? Math.max(1, p.entity_count) : 1;
+}
+
+// najveća lokalna gustoća u učitanim podacima: točke se grupiraju u ćelije veličine polumjera
+// toplinske karte, pa je crvena boja samo tamo gdje se točke stvarno preklapaju
+function computeAutoMax(points) {
+    const radius = parseFloat(document.getElementById('paramRadius').value) || 35;
+    const cell = Math.max(radius, 10);
+    const grid = new Map();
+    points.forEach(p => {
+        const pt = spatialMap.project([p.lat, p.lon], spatialMap.getZoom());
+        const key = Math.floor(pt.x / cell) + '_' + Math.floor(pt.y / cell);
+        grid.set(key, (grid.get(key) || 0) + spWeight(p));
+    });
+    let max = 0;
+    grid.forEach(v => { if (v > max) max = v; });
+    return Math.max(1, Math.round(max * 10) / 10);
+}
+
+function renderHeat() {
+    if (heatLayer) { spatialMap.removeLayer(heatLayer); heatLayer = null; }
+    if (!document.getElementById('layerHeat').checked) return;
+    const radius = parseFloat(document.getElementById('paramRadius').value) || 35;
+    const blur   = parseFloat(document.getElementById('paramBlur').value) || 25;
+    const max    = parseFloat(document.getElementById('paramMax').value) || 1;
+    const pts = spData.points.map(p => [p.lat, p.lon, spWeight(p)]);
+    // maxZoom prati trenutni zoom karte, inače su točke kod udaljenog prikaza jedva vidljive
+    heatLayer = L.heatLayer(pts, {
+        radius, blur, max, maxZoom: spatialMap.getZoom(),
+        gradient: { 0.2: '#4575b4', 0.45: '#74add1', 0.65: '#fdae61', 0.82: '#f46d43', 1.0: '#d73027' }
+    }).addTo(spatialMap);
+}
+
+function renderPoints() {
+    layerPointsGroup.clearLayers();
+    spData.points.forEach(p => {
+        const color = spTypeColors[p.detection_type] || '#6c757d';
+        L.circleMarker([p.lat, p.lon], { radius: 4, color, fillColor: color, fillOpacity: .8, weight: 1 })
+            .bindPopup(`<b>${p.detection_type}</b><br><small>${p.source} · ${p.entity_count} ent. · ${p.detected_at}</small>`)
+            .addTo(layerPointsGroup);
+    });
+}
+
+function renderRoutes() {
+    layerRoutesGroup.clearLayers();
+    spData.routes.forEach(pts => {
+        L.polyline(pts, { color: '#f0c040', weight: 1.5, opacity: .35 }).addTo(layerRoutesGroup);
+    });
+}
+
+function renderZones() {
+    layerZonesGroup.clearLayers();
+    spData.zones.forEach(z => {
+        const layer = (z.boundary && z.boundary.length >= 3)
+            ? L.polygon(z.boundary, { color: '#9aa5b1', weight: 1.5, fillOpacity: .03 })
+            : L.circle([z.lat, z.lon], { radius: z.radius_km * 1000, color: '#9aa5b1', weight: 1.5, fillOpacity: .03 });
+        layer.bindPopup(z.name).addTo(layerZonesGroup);
+    });
+}
+
+function syncLayerVisibility() {
+    document.getElementById('layerPoints').checked ? layerPointsGroup.addTo(spatialMap) : spatialMap.removeLayer(layerPointsGroup);
+    document.getElementById('layerRoutes').checked ? layerRoutesGroup.addTo(spatialMap) : spatialMap.removeLayer(layerRoutesGroup);
+    document.getElementById('layerZones').checked  ? layerZonesGroup.addTo(spatialMap)  : spatialMap.removeLayer(layerZonesGroup);
+    renderHeat();
+}
+
+function renderAllLayers() {
+    renderPoints();
+    renderRoutes();
+    renderZones();
+    syncLayerVisibility();
+    const routesNote = (spData.routes_total ?? spData.routes.length) > spData.routes.length
+        ? ` (prikazano ${spData.routes_shown} od ${spData.routes_total} najnovijih)`
+        : '';
+    document.getElementById('spFilteredCount').textContent =
+        `${spData.points.length} detekcija · ${spData.routes.length} ruta leta${routesNote}`;
+}
+
+function spBuildQuery() {
+    const params = new URLSearchParams();
+    const station = document.getElementById('spStation')?.value;
+    if (station) params.set('station_id', station);
+    const from = document.getElementById('spDateFrom').value;
+    if (from) params.set('date_from', from);
+    const to = document.getElementById('spDateTo').value;
+    if (to) params.set('date_to', to);
+    const type = document.getElementById('spType').value;
+    if (type) params.set('detection_type', type);
+    const source = document.getElementById('spSource').value;
+    if (source) params.set('source', source);
+    const block = document.getElementById('spTimeBlock').value;
+    if (block !== '') params.set('time_block', block);
+    return params.toString();
+}
+
+function loadSpatialData() {
+    document.getElementById('spFilteredCount').textContent = 'Učitavanje...';
+    fetch('{{ route('analytics.spatialData') }}?' + spBuildQuery())
+        .then(r => r.json())
+        .then(d => {
+            spData = d;
+            if (spData.points.length) {
+                spatialMap.fitBounds(L.latLngBounds(spData.points.map(p => [p.lat, p.lon])).pad(0.1));
+            }
+            document.getElementById('paramMax').value = computeAutoMax(spData.points);
+            renderAllLayers();
+        })
+        .catch(() => { document.getElementById('spFilteredCount').textContent = 'Greška pri učitavanju'; });
+}
+
+document.getElementById('spApply').addEventListener('click', loadSpatialData);
+document.getElementById('spReset').addEventListener('click', () => {
+    ['spStation', 'spDateFrom', 'spDateTo', 'spType', 'spSource', 'spTimeBlock'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    if (document.getElementById('spAdministration')) document.getElementById('spAdministration').value = '';
+    loadSpatialData();
+});
+['layerHeat', 'layerPoints', 'layerRoutes', 'layerZones'].forEach(id => {
+    document.getElementById(id).addEventListener('change', syncLayerVisibility);
+});
+document.getElementById('paramRadius').addEventListener('change', () => {
+    document.getElementById('paramMax').value = computeAutoMax(spData.points);
+    renderHeat();
+});
+['paramBlur', 'paramMax', 'paramWeightByEntities'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderHeat);
+});
+
+// odabir uprave pa postaje (samo glavni administrator)
+const spAdminSelect = document.getElementById('spAdministration');
+if (spAdminSelect) {
+    const spStationSelect = document.getElementById('spStation');
+    spAdminSelect.addEventListener('change', () => {
+        const adminId = spAdminSelect.value;
+        Array.from(spStationSelect.options).forEach(opt => {
+            if (!opt.value) return;
+            opt.hidden = adminId !== '' && opt.dataset.admin != adminId;
+        });
+        if (adminId !== '' && spStationSelect.value &&
+            spStationSelect.options[spStationSelect.selectedIndex]?.dataset.admin != adminId) {
+            spStationSelect.value = '';
+        }
+    });
+}
+
+loadSpatialData();
+
+// Zajedničke postavke grafova
 const tooltip = {
     backgroundColor: '#0d2460',
     borderColor: 'rgba(240,192,64,0.4)',
@@ -231,7 +468,7 @@ function barScales(yLabel) {
     };
 }
 
-// ── By type (doughnut) ───────────────────────────────────────────────────────
+// Po vrsti
 new Chart(document.getElementById('chartType'), {
     type: 'doughnut',
     data: {
@@ -252,7 +489,7 @@ new Chart(document.getElementById('chartType'), {
     }
 });
 
-// ── By hour ──────────────────────────────────────────────────────────────────
+// Po satu
 new Chart(document.getElementById('chartHour'), {
     type: 'bar',
     data: {
@@ -272,7 +509,7 @@ new Chart(document.getElementById('chartHour'), {
     }
 });
 
-// ── By weekday ───────────────────────────────────────────────────────────────
+// Po danu u tjednu
 new Chart(document.getElementById('chartDow'), {
     type: 'bar',
     data: {
@@ -292,7 +529,7 @@ new Chart(document.getElementById('chartDow'), {
     }
 });
 
-// ── Monthly trend (line) ─────────────────────────────────────────────────────
+// Po mjesecima
 const monthCtx  = document.getElementById('chartMonth').getContext('2d');
 const monthGrad = monthCtx.createLinearGradient(0, 0, 0, 260);
 monthGrad.addColorStop(0,   'rgba(240,192,64,0.35)');
@@ -321,14 +558,14 @@ new Chart(monthCtx, {
     }
 });
 
-// ── Escalation (doughnut) ────────────────────────────────────────────────────
-new Chart(document.getElementById('chartEscalation'), {
+// Po izvoru
+new Chart(document.getElementById('chartSource'), {
     type: 'doughnut',
     data: {
-        labels: {!! json_encode($chartEscalation['labels']) !!},
+        labels: {!! json_encode($chartSource['labels']) !!},
         datasets: [{
-            data:            {!! json_encode($chartEscalation['data']) !!},
-            backgroundColor: {!! json_encode($chartEscalation['colors']) !!},
+            data:            {!! json_encode($chartSource['data']) !!},
+            backgroundColor: {!! json_encode($chartSource['colors']) !!},
             borderWidth: 2,
             borderColor: '#112247',
         }]
@@ -339,6 +576,27 @@ new Chart(document.getElementById('chartEscalation'), {
             legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.6)', padding: 14, font: { size: 12 } } },
             tooltip,
         }
+    }
+});
+
+// Po postaji
+new Chart(document.getElementById('chartStation'), {
+    type: 'bar',
+    data: {
+        labels: {!! json_encode($chartStation['labels']) !!},
+        datasets: [{
+            data: {!! json_encode($chartStation['data']) !!},
+            backgroundColor: 'rgba(13,110,253,0.55)',
+            borderColor: '#0d6efd',
+            borderWidth: 1,
+            borderRadius: 3,
+        }]
+    },
+    options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false }, tooltip },
+        scales: barScales('Detekcija'),
     }
 });
 </script>
