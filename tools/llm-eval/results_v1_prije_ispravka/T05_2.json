@@ -1,0 +1,19 @@
+{
+    "id": "T05",
+    "rep": 2,
+    "user": "mario.kovacevic@mup.hr",
+    "query": "Koliko je detekcija zabilježeno u posljednjih 30 dana i raste li njihov broj?",
+    "ran_at": "2026-10-26 16:10:47",
+    "seconds": 5.1,
+    "status": 200,
+    "tool_calls": [
+        {
+            "name": "get_insights",
+            "input": []
+        }
+    ],
+    "tool_results": [
+        "{\"total\":474,\"by_type\":{\"group\":491,\"other\":62,\"person\":163,\"vehicle\":142},\"by_source\":{\"trail_camera\":187,\"ground_observation\":151,\"drone\":136},\"trend_30d\":\"pad\",\"trend_slope\":-0.9}"
+    ],
+    "reply": "U posljednjih 30 dana zabilježeno je ukupno 474 detekcije, ali trend je **padajući** (ne raste) — blagi pad u odnosu na prethodnih 30 dana."
+}

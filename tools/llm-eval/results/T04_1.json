@@ -1,0 +1,19 @@
+{
+    "id": "T04",
+    "rep": 1,
+    "user": "damir.vukovic@mup.hr",
+    "query": "Koliko se mogu pouzdati u procjene rizika koje sustav daje?",
+    "ran_at": "2026-10-26 20:02:56",
+    "seconds": 13,
+    "status": 200,
+    "tool_calls": [
+        {
+            "name": "get_model_quality",
+            "input": []
+        }
+    ],
+    "tool_results": [
+        "{\"najbolji_model\":\"random_forest\",\"kriterij_odabira\":\"najve\\u0107i F1 na testnom skupu\",\"testno_razdoblje_od\":\"2026-07-27\",\"broj_primjera\":2016,\"udio_pozitivnih\":0.043,\"broj_zona\":1,\"nasumicni_odabir_top5_zona\":1,\"nasumicni_odabir_top10_zona\":1,\"napomena\":\"Prosje\\u010dna preciznost nasumi\\u010dnog modela pribli\\u017eno je jednaka udjelu pozitivnih primjera. Pokrivenost top-K zona usporedi s nasumi\\u010dnim odabirom; ako zona ima K ili manje, pokrivenost je trivijalno 1 i ni\\u0161ta ne govori o modelu.\",\"modeli\":{\"logistic_regression\":{\"naziv\":\"Logistic Regression\",\"f1\":0,\"precision\":0,\"recall\":0,\"roc_auc\":0.513,\"average_precision\":0.066,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1},\"knn\":{\"naziv\":\"k-Nearest Neighbors\",\"f1\":0.028,\"precision\":0.019,\"recall\":0.053,\"roc_auc\":0.438,\"average_precision\":0.059,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1},\"random_forest\":{\"naziv\":\"Random Forest\",\"f1\":0.065,\"precision\":0.047,\"recall\":0.105,\"roc_auc\":0.562,\"average_precision\":0.068,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1},\"gradient_boosting\":{\"naziv\":\"Gradient Boosting\",\"f1\":0,\"precision\":0,\"recall\":0,\"roc_auc\":0.481,\"average_precision\":0.051,\"pokrivenost_top5_zona\":1,\"pokrivenost_top10_zona\":1}}}"
+    ],
+    "reply": "Kratko: zasad vrlo ograničeno – procjene treba uzeti samo kao grubu orijentaciju, ne kao pouzdan putokaz.\n\nRazlozi:\n- **Najbolji model** je Random Forest, ali su mu pokazatelji slabi: F1 = 0,065, ROC-AUC = 0,562 (0,5 je nasumično pogađanje), prosječna preciznost 0,068 (uz 4,3 % pozitivnih primjera – dakle jedva bolje od slučajnog).\n- Ostali modeli su još slabiji (Logistic Regression i Gradient Boosting imaju F1 = 0).\n- **Samo 1 zona** ima dovoljno podataka za evaluaciju, pa pokrivenost \"top-5\/top-10 zona\" ovdje ništa ne govori (trivijalno je 1).\n- Testirano je na razdoblju od 27.7.2026., na 2016 primjera uz vrlo malo pozitivnih slučajeva.\n\nZaključak: koristi rang zona kao dodatnu informaciju uz vlastitu procjenu i terensko iskustvo, a ne kao samostalan temelj za odluke. Pouzdanost će rasti tek s više letova i detekcija po zonama."
+}

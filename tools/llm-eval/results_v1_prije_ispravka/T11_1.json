@@ -1,0 +1,19 @@
+{
+    "id": "T11",
+    "rep": 1,
+    "user": "maja.knezevic@mup.hr",
+    "query": "Gdje bih trebao pojačati nadzor na svom području?",
+    "ran_at": "2026-10-26 16:15:18",
+    "seconds": 7.7,
+    "status": 200,
+    "tool_calls": [
+        {
+            "name": "get_zone_risk",
+            "input": []
+        }
+    ],
+    "tool_results": [
+        "{\"dow\":0,\"block\":4,\"zones\":[{\"id\":\"K1\",\"lat\":45.25503819534884,\"lon\":16.59813902093023,\"risk_index\":null,\"recommendation\":\"insufficient_data\",\"explanation\":\"Nedovoljno podataka za zonu K1 \\u2014 potrebno je minimalno 5 letova i 120 minuta nadzora za pouzdanu preporuku.\",\"detections_count\":43,\"flights_count\":0,\"total_hours\":0,\"trend_pct\":-100,\"near\":\"9 km ju\\u017eno od mjesta Sunja\"}]}"
+    ],
+    "reply": "Za danas (ponedjeljak, blok 16–20 h) imamo samo jednu zonu:\n\n- **K1** – 9 km južno od mjesta Sunja (45.2550, 16.5981): **nedovoljno podataka** za pouzdanu preporuku. Zona ima 43 povijesne detekcije, ali još nema odrađenih letova ni dovoljno sati nadzora u ovom bloku za procjenu rizika.\n\nPreporuka: pošaljite dron na **K1** upravo zato da prikupite nadzor (potrebno je min. 5 letova i 120 min) kako bi sustav mogao dati pouzdanu procjenu rizika. Želite li da provjerim rizik za drugi dan ili doba dana?"
+}

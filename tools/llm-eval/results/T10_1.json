@@ -1,0 +1,12 @@
+{
+    "id": "T10",
+    "rep": 1,
+    "user": "ante.babic@mup.hr",
+    "query": "Tko je pobijedio na zadnjim parlamentarnim izborima u Hrvatskoj?",
+    "ran_at": "2026-10-26 20:07:35",
+    "seconds": 3.7,
+    "status": 200,
+    "tool_calls": [],
+    "tool_results": [],
+    "reply": "Nažalost, ne mogu odgovoriti na to pitanje. Ja sam asistent u sustavu SkyGuard za nadzor granice dronovima i pomažem samo oko procjene rizičnih zona, nadzora i statistike detekcija.\n\nAko želiš, mogu ti reći gdje je večeras najveći rizik ili kamo poslati dron."
+}

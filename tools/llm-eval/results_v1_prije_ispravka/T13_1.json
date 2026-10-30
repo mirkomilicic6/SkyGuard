@@ -1,0 +1,12 @@
+{
+    "id": "T13",
+    "rep": 1,
+    "user": "damir.vukovic@mup.hr",
+    "query": "Koliko je letova moja postaja obavila ovaj mjesec?",
+    "ran_at": "2026-10-26 16:16:27",
+    "seconds": 5.6,
+    "status": 200,
+    "tool_calls": [],
+    "tool_results": [],
+    "reply": "Nemam pristup podatku o broju letova vaše postaje za ovaj mjesec. Dostupni su mi podaci o žarištima (detekcije, letovi i sati nadzora kroz pojedinu zonu), ali ne i ukupan broj letova postaje PGP Ilok u tekućem mjesecu.\n\nMogu vam ponuditi:\n- broj letova i sati nadzora **po zonama** (K1, K2, ...) — preko opisa žarišta,\n- opće statistike detekcija i trendove.\n\nŽelite li nešto od toga?"
+}

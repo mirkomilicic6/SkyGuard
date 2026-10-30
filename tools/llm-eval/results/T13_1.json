@@ -1,0 +1,12 @@
+{
+    "id": "T13",
+    "rep": 1,
+    "user": "damir.vukovic@mup.hr",
+    "query": "Koliko je letova moja postaja obavila ovaj mjesec?",
+    "ran_at": "2026-10-26 20:09:00",
+    "seconds": 4.8,
+    "status": 200,
+    "tool_calls": [],
+    "tool_results": [],
+    "reply": "Nemam pristup podatku o broju letova vaše postaje — dostupni alati pokrivaju statistiku detekcija i nadzor po žarištima (zonama), ali ne broj letova po postaji za tekući mjesec.\n\nMogu vam pokazati:\n- ukupan nadzor (letovi i sati) kroz pojedine zone (K1, K2, ...),\n- statistiku detekcija (ukupno, zadnjih 30 dana, trend).\n\nŽelite li neki od tih prikaza?"
+}

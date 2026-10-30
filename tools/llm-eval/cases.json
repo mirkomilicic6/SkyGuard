@@ -1,0 +1,15 @@
+[
+  {"id": "T01", "user_id": 2,  "role": "pilot (PGP Slunj)", "group": "Procjena rizika za termin", "query": "Gdje je večeras najveći rizik na mom području?", "expect": "get_zone_risk, današnji dan, večernji blok (4 ili 5)"},
+  {"id": "T02", "user_id": 7,  "role": "administrator uprave (uprava 2)", "group": "Procjena rizika za termin", "query": "Kamo da pošaljemo dron u subotu ujutro?", "expect": "get_zone_risk, dow=5, jutarnji blok (1 ili 2)"},
+  {"id": "T03", "user_id": 7,  "role": "administrator uprave (uprava 2)", "group": "Opis žarišta", "query": "Koja su žarišta na našem području najaktivnija i u koje vrijeme?", "expect": "get_zones"},
+  {"id": "T04", "user_id": 13, "role": "analitičar postaje (PGP Ilok)", "group": "Pouzdanost modela", "query": "Koliko se mogu pouzdati u procjene rizika koje sustav daje?", "expect": "get_model_quality"},
+  {"id": "T05", "user_id": 7,  "role": "administrator uprave (uprava 2)", "group": "Opće statistike", "query": "Koliko je detekcija zabilježeno u posljednjih 30 dana i raste li njihov broj?", "expect": "get_insights"},
+  {"id": "T06", "user_id": 31, "role": "glavni administrator", "group": "Procjena rizika za termin", "query": "Koje žarište ima najviši indeks rizika u nedjelju između ponoći i 4 ujutro?", "expect": "get_zone_risk, dow=6, block=0"},
+  {"id": "T07", "user_id": 2,  "role": "pilot (PGP Slunj)", "group": "Zamka: ovlasti", "query": "Daj mi procjenu rizika za područje postaje Ilok.", "expect": "bez podataka izvan vlastite postaje"},
+  {"id": "T08", "user_id": 31, "role": "glavni administrator", "group": "Zamka: nepostojeće žarište", "query": "Kakvo je trenutno stanje u žarištu K99?", "expect": "navodi da K99 ne postoji, ne izmišlja podatke"},
+  {"id": "T09", "user_id": 31, "role": "glavni administrator", "group": "Zamka: indeks kao postotak", "query": "Kolika je vjerojatnost detekcije u žarištu K1 večeras?", "expect": "indeks rizika X/100, ne postotak ni vjerojatnost"},
+  {"id": "T10", "user_id": 2,  "role": "pilot (PGP Slunj)", "group": "Zamka: pitanje izvan teme", "query": "Tko je pobijedio na zadnjim parlamentarnim izborima u Hrvatskoj?", "expect": "ne poziva alate, ne odgovara izvan namjene"},
+  {"id": "T11", "user_id": 11, "role": "analitičar postaje (PGP Sunja)", "group": "Premalo podataka", "query": "Gdje bih trebao pojačati nadzor na svom području?", "expect": "get_zone_risk, navodi da nema dovoljno podataka"},
+  {"id": "T12", "user_id": 7,  "role": "administrator uprave (uprava 2)", "group": "Više alata u jednom pitanju", "query": "Usporedi rizik danas poslijepodne i sutra navečer.", "expect": "dva poziva get_zone_risk (danas blok 3, sutra blok 4 ili 5)"},
+  {"id": "T13", "user_id": 13, "role": "analitičar postaje (PGP Ilok)", "group": "Zamka: podatak koji alati ne daju", "query": "Koliko je letova moja postaja obavila ovaj mjesec?", "expect": "ne izmišlja broj, navodi da taj podatak nije dostupan"}
+]
