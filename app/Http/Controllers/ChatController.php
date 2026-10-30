@@ -19,7 +19,7 @@ class ChatController extends Controller
         $this->mlBase = config('services.ml.url');
     }
 
-    /** Full-page version of the assistant — same /chat endpoint, bigger UI. */
+    // Asistent na zasebnoj stranici (isti /chat, veći prikaz)
     public function page()
     {
         return view('ai.assistant');
@@ -34,11 +34,8 @@ class ChatController extends Controller
 
         $user = auth()->user();
 
-        // Same role-aware scope as everywhere else in the app (admin → whole
-        // administration, viewer/pilot → own station only, super admin →
-        // unrestricted) — previously this always resolved the administration
-        // even for a plain viewer/pilot, so e.g. a PGP Strošinci user got
-        // recommendations mixed in from every other station in their uprava.
+        // opseg podataka kao u ostatku aplikacije: administrator vidi upravu,
+        // analitičar i pilot svoju postaju, glavni administrator sve
         $stationId = null;
         $adminId   = null;
 
@@ -123,15 +120,8 @@ class ChatController extends Controller
         ]);
     }
 
-    /**
-     * Whenever the reply carries any map points (risk-grid recommendations,
-     * clusters, a prediction), add the asking user's own station as a
-     * distinct reference marker — raw grid coordinates mean little to a
-     * pilot/viewer on their own; seeing "your station is here, the
-     * recommendation is there" makes the mini map actually readable.
-     * Super admin (no station) and callers with nothing else to show get no
-     * marker, so a plain text-only reply never grows an unrelated pin.
-     */
+    // Ako odgovor ima točke za kartu, dodaje se i postaja korisnika kao orijentir.
+    // Glavni administrator nema postaju, pa se tada ne dodaje.
     private function addOwnStationMarker(array &$points, $user): void
     {
         if (empty($points) || $user->station_id === null) {
@@ -151,11 +141,7 @@ class ChatController extends Controller
         ]);
     }
 
-    /**
-     * Pull lat/lon-bearing recommendations out of a tool result so the widget
-     * can plot them on a mini map instead of the pilot having to eyeball
-     * coordinates in the chat text.
-     */
+    // Izdvaja žarišta s koordinatama iz rezultata alata za malu kartu u razgovoru
     private function collectMapPoints(string $name, array $input, mixed $result, array &$points): void
     {
         if (!is_array($result)) {
@@ -169,7 +155,7 @@ class ChatController extends Controller
         };
     }
 
-    /** Recommendation type → mini-map marker kind. */
+    // Vrsta preporuke i oznaka na karti
     private const ZONE_RISK_KIND = [
         'increase' => 'increase',
         'maintain' => 'maintain',
@@ -285,12 +271,8 @@ PROMPT;
         }
     }
 
-    /**
-     * Stations the current query is allowed to reference: just the user's
-     * own station (viewer/pilot), every station in their administration
-     * (admin), or all of them (super admin — used only for the "near"
-     * description below, never to restrict).
-     */
+    // Postaje koje se smiju koristiti za opis lokacije: vlastita postaja,
+    // postaje uprave ili sve postaje za glavnog administratora
     private function referenceStations(?int $stationId, ?int $adminId): Collection
     {
         if ($stationId) {
@@ -303,17 +285,9 @@ PROMPT;
         return BorderPoliceStation::all();
     }
 
-    /**
-     * For each lat/lon point: find the nearest in-scope station, attach a
-     * human-readable "near" description built from it, and — only when the
-     * query is scoped to a single station (a viewer/pilot asking about
-     * their own postaja) — drop any point that falls outside that station's
-     * own territory. This is the actual fix for recommendations "leaking"
-     * outside a station's own area: it's no longer enough for a point to
-     * merely be built from that station's detections, it must now also
-     * geographically fall within the station's territory (drawn boundary,
-     * or the default 10km radius circle) to be shown at all.
-     */
+    // Svakoj točki dodaje opis lokacije prema najbližoj postaji.
+    // Za korisnike jedne postaje izbacuje točke izvan područja postaje
+    // (ucrtana granica ili krug od 10 km).
     private function enrichLocations(array $points, Collection $stations, bool $restrictToStations): array
     {
         if ($stations->isEmpty()) {
@@ -384,7 +358,7 @@ PROMPT;
         return $labels[(int) round($angleDeg / 45) % 8];
     }
 
-    /** MySQL DAYOFWEEK() convention (1 = Sunday), which is what ml-service's zone stats carry. */
+    // Dani u tjednu kako ih broji MySQL (1 = nedjelja)
     private const MYSQL_DOW_LABELS = [1 => 'nedjelja', 2 => 'ponedjeljak', 3 => 'utorak', 4 => 'srijeda',
         5 => 'četvrtak', 6 => 'petak', 7 => 'subota'];
 
@@ -425,11 +399,8 @@ PROMPT;
         ] + $this->outsideTerritoryNote($rows, $kept);
     }
 
-    /**
-     * A station-scoped query can find zones whose centre lies outside the
-     * station's own territory; those are dropped, and without this note the
-     * model only sees an empty list and has to guess why.
-     */
+    // Ako žarišta postaje postoje, ali su izvan njezina područja, modelu se to objašnjava
+    // napomenom, inače bi dobio prazan popis i morao bi nagađati razlog.
     private function outsideTerritoryNote(array $rows, array $kept): array
     {
         if (empty($rows) || !empty($kept)) {
@@ -468,7 +439,7 @@ PROMPT;
         return ['zones' => $kept] + $this->outsideTerritoryNote($rows, $kept);
     }
 
-    /** Keep only the headline numbers — the full response also carries ROC/PR curves and feature importances. */
+    // Samo glavne mjere modela, bez krivulja i važnosti obilježja
     private function modelQuality(?array $data): array
     {
         if (empty($data['trained'])) {
@@ -497,7 +468,7 @@ PROMPT;
             'broj_primjera' => $data['n_rows'],
             'udio_pozitivnih' => round($data['n_positive'] / max(1, $data['n_rows']), 3),
             'broj_zona' => $nZones,
-            // Top-K coverage only means something against what picking K zones at random would give.
+            // pokrivenost top-K ima smisla samo uz usporedbu s nasumičnim odabirom
             'nasumicni_odabir_top5_zona' => $nZones ? round(min(1, 5 / $nZones), 3) : null,
             'nasumicni_odabir_top10_zona' => $nZones ? round(min(1, 10 / $nZones), 3) : null,
             'napomena' => 'Prosječna preciznost nasumičnog modela približno je jednaka udjelu pozitivnih primjera. Pokrivenost top-K zona usporedi s nasumičnim odabirom; ako zona ima K ili manje, pokrivenost je trivijalno 1 i ništa ne govori o modelu.',

@@ -9,7 +9,7 @@
         {{-- Left sidebar toggler link --}}
         @include('adminlte::partials.navbar.menu-item-left-sidebar-toggler')
 
-        {{-- Global search (admin only) --}}
+        {{-- Pretraga (samo administrator) --}}
         @auth
         @if(auth()->user()->hasRole('admin'))
         <li class="nav-item d-none d-sm-flex align-items-center" id="global-search" style="position:relative">
@@ -103,7 +103,7 @@
         {{-- Custom right links --}}
         @yield('content_top_nav_right')
 
-        {{-- Language switcher --}}
+        {{-- Odabir jezika --}}
         @php $lang = session('locale', config('app.locale')); @endphp
         <li class="nav-item d-flex align-items-center mr-2" style="gap:.35rem">
             <i class="fas fa-globe-europe text-muted" style="font-size:.9rem"></i>
@@ -117,7 +117,7 @@
             </div>
         </li>
 
-        {{-- Notification bell (admin + pilot) --}}
+        {{-- Obavijesti (administrator i pilot) --}}
         @auth
         @if(auth()->user()->hasRole(['admin', 'pilot']))
         <li class="nav-item dropdown" id="notif-bell">

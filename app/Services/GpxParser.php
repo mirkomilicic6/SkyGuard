@@ -8,7 +8,7 @@ class GpxParser
     {
         $xml = simplexml_load_file($absolutePath);
 
-        // Works with or without XML namespace
+        // radi i s XML imenskim prostorom i bez njega
         $trackPoints = $xml->xpath('//*[local-name()="trkpt"]');
 
         if (empty($trackPoints)) {
@@ -28,13 +28,13 @@ class GpxParser
                 }
             }
 
-            // Try to get speed from extensions
+            // brzina iz proširenja, ako postoji
             $speed = null;
             $extensions = $pt->xpath('*[local-name()="extensions"]');
             if (!empty($extensions)) {
                 foreach ($extensions[0]->children() as $ext) {
                     if (strtolower($ext->getName()) === 'speed') {
-                        $speed = round((float) $ext * 3.6, 2); // m/s → km/h
+                        $speed = round((float) $ext * 3.6, 2); // iz m/s u km/h
                     }
                 }
             }
@@ -49,7 +49,7 @@ class GpxParser
             ];
         }
 
-        // Calculate speed from position+time where not provided
+        // ako brzina nije zapisana, računa se iz položaja i vremena
         for ($i = 1; $i < count($points); $i++) {
             if ($points[$i]['speed'] === null
                 && $points[$i]['time'] !== null
@@ -63,7 +63,7 @@ class GpxParser
                 $points[$i]['speed'] = $seconds > 0 ? round($dist / ($seconds / 3600), 2) : 0;
             }
         }
-        // First point gets same speed as second
+        // prva točka dobiva brzinu druge
         if (count($points) > 1 && $points[0]['speed'] === null) {
             $points[0]['speed'] = $points[1]['speed'];
         }

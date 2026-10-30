@@ -24,7 +24,7 @@
     $isOwner   = $maintenance->reported_by === auth()->id();
 @endphp
 
-{{-- Workflow action banner for admin --}}
+{{-- Radnje za obradu prijave (administrator) --}}
 @if($isAdmin && !$maintenance->isResolved())
 <div class="card mb-3" style="border-left: 4px solid var(--gold)">
     <div class="card-body py-2 d-flex align-items-center gap-3" style="gap:.75rem">

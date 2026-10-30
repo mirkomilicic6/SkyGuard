@@ -22,7 +22,7 @@
 @endif
 
 @if($pilotView)
-{{-- ── Pilot view: simple crew list ──────────────────────────────────────── --}}
+{{-- Pilot: popis kolega --}}
 <div class="card">
     <div class="card-header">
         <span class="card-title">
@@ -64,7 +64,7 @@
 </div>
 
 @else
-{{-- ── Admin / viewer: full user management ──────────────────────────────── --}}
+{{-- Administrator i analitičar: upravljanje korisnicima --}}
 
 @if($administrations)
 <div class="card card-outline card-primary mb-3">

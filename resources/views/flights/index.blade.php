@@ -17,7 +17,7 @@
     <div class="alert alert-success">{{ session('success') }}</div>
 @endif
 
-{{-- Date filter --}}
+{{-- Filter po datumu --}}
 <div class="card card-outline card-primary">
     <div class="card-body py-2">
         <form method="GET" action="{{ route('flights.index') }}" class="form-inline flex-wrap" style="gap:0.5rem;">

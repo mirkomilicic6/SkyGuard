@@ -1,9 +1,5 @@
-"""
-Shared model-evaluation helper used by both the risk-grid model comparison
-(main.py's /model-metrics) and the DBSCAN-zone model comparison (zones.py's
-/zone-model-metrics) — kept in its own module so neither file has to import
-from the other.
-"""
+# Zajednička funkcija za evaluaciju modela.
+# Koriste je usporedba modela za mrežu rizika (main.py) i za DBSCAN žarišta (zones.py).
 import numpy as np
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
@@ -12,12 +8,9 @@ from sklearn.metrics import (
 )
 
 
+# Traži prag odluke s najvećim F1 na validacijskom skupu.
+# Ako u validacijskom skupu postoji samo jedan razred, vraća se standardni prag 0,5.
 def _best_f1_threshold(y_val, proba_val) -> float:
-    """Scans the validation precision-recall curve and returns the decision
-    threshold that maximises F1 there. Falls back to the standard 0.5 cutoff
-    when validation data can't support tuning (e.g. a single class present —
-    expected on some models' tiny early-period validation slices given how
-    rare real border incidents are)."""
     if len(set(y_val)) < 2:
         return 0.5
     precision, recall, thresholds = precision_recall_curve(y_val, proba_val)
@@ -28,24 +21,13 @@ def _best_f1_threshold(y_val, proba_val) -> float:
     return float(thresholds[int(np.argmax(f1))])
 
 
+# Uči jedan model i računa mjere na testnom skupu.
+# Ako je zadan validacijski skup, prag odluke bira se na njemu, a testni skup se ne dira.
+# ROC-AUC, AP i krivulje ne ovise o pragu.
+# Uz return_artifacts=True vraća i procjene na testnom skupu (za pokrivenost top-K žarišta).
 def evaluate_model(model, X_train, y_train, w_train, X_test, y_test, feature_names=None,
                     X_val=None, y_val=None, return_artifacts=False):
-    """Fit one classifier and score it on held-out data. Not every estimator
-    (e.g. KNeighborsClassifier) accepts sample_weight, so that's tried first
-    and silently dropped if unsupported.
-
-    When `X_val`/`y_val` (a chronologically earlier slice than `X_test`) are
-    given, the decision threshold used for the point metrics (precision/
-    recall/F1/accuracy/confusion matrix) is tuned on that validation slice
-    (max-F1) instead of the sklearn default of 0.5 — `X_test` stays reserved
-    for the final, untouched-by-tuning readout. Threshold-independent metrics
-    (ROC-AUC, Average Precision, the curves) are unaffected either way, since
-    they're computed directly from predicted probabilities.
-
-    When `return_artifacts=True`, returns `(metrics, y_proba_test, model)`
-    instead of just `metrics` — used by callers that need the raw test-set
-    probabilities for downstream operational metrics (e.g. top-K zone
-    coverage) without re-fitting the model."""
+    # KNN ne podržava težine primjera, pa se tada uči bez njih
     try:
         model.fit(X_train, y_train, sample_weight=w_train)
     except TypeError:
@@ -75,6 +57,7 @@ def evaluate_model(model, X_train, y_train, w_train, X_test, y_test, feature_nam
         "fn": int(cm[1][0]), "tp": int(cm[1][1]),
     }
 
+    # ROC i PR krivulje, skraćene na najviše 40 točaka za prikaz na stranici
     if len(set(y_test)) > 1:
         fpr, tpr, _ = roc_curve(y_test, y_proba)
         if len(fpr) > 40:

@@ -22,13 +22,13 @@ class GenerateSupplementaryFlights extends Command
 
     protected $description = 'Fill the Jul-Sep 2026 flight gap for already-staffed stations, with GPX routes and a realistic minority of linked detections';
 
-    /** Marks rows created by this command, so re-running it is a no-op per station (idempotent). */
+    // Oznaka zapisa koje je stvorila ova naredba, da ponovno pokretanje ne stvara duplikate
     private const MARKER = 'Dopuna sintetičkih letova — faza 2';
 
     private const WINDOW_START = '2026-07-16 00:00:00';
     private const WINDOW_END   = '2026-09-16 23:59:59';
 
-    /** type => [min entities, max entities, relative weight] — same weights as GenerateFlightDetections. */
+    // vrsta => [najmanji broj, najveći broj, relativna težina], isto kao u GenerateFlightDetections
     private const DETECTION_TYPES = [
         'person'  => ['min' => 1, 'max' => 1, 'weight' => 40],
         'group'   => ['min' => 2, 'max' => 10, 'weight' => 28],
@@ -138,19 +138,17 @@ class GenerateSupplementaryFlights extends Command
         return self::SUCCESS;
     }
 
-    /** @return array{0: array, 1: array, 2: array} [flight attributes, gpx points, detections] */
+    // Vraća [podatke leta, GPS točke, detekcije]
     private function buildFlight(BorderPoliceStation $station, User $pilot, Drone $drone): array
     {
         $windowStart = Carbon::parse(self::WINDOW_START);
         $windowEnd   = Carbon::parse(self::WINDOW_END);
         $totalSeconds = $windowEnd->getTimestamp() - $windowStart->getTimestamp();
 
-        $isNight = $this->rng->getInt(1, 100) <= 36; // matches the existing ~64/36 day/night split
+        $isNight = $this->rng->getInt(1, 100) <= 36; // omjer dan/noć oko 64/36, kao u postojećim podacima
         $flightDate = $this->randomDateTimeInWindow($windowStart, $totalSeconds, $isNight);
 
-        // 60% of flights orbit close to the station's own registered point (its
-        // known crossing/hotspot); 40% range further into the wider territory —
-        // "kroz žarišta i izvan žarišta" without inventing fake named hotspots.
+        // 60 % letova kruži blizu lokacije postaje, ostali idu dalje po području postaje
         $nearHotspot = $this->rng->getInt(1, 100) <= 60;
         $center = $nearHotspot
             ? $this->stationPoint($station, 2.0)
@@ -196,8 +194,7 @@ class GenerateSupplementaryFlights extends Command
 
     private function realisticDuration(): int
     {
-        // Sample around the existing dataset's mean (~25 min), clipped to its
-        // observed range (6-55 min) — rule 11.
+        // trajanje oko prosjeka postojećih letova (oko 25 min), između 6 i 55 min
         $val = (int) round($this->normalSample(24.9, 9));
         return max(6, min(55, $val));
     }
@@ -215,7 +212,7 @@ class GenerateSupplementaryFlights extends Command
         return $station->hasBoundary() ? 6.0 : BorderPoliceStation::TERRITORY_RADIUS_KM;
     }
 
-    /** A point guaranteed to satisfy $station->containsPoint() (rule 4). */
+    // Točka koja je sigurno unutar područja postaje
     private function stationPoint(BorderPoliceStation $station, float $radiusKm): array
     {
         for ($attempt = 0; $attempt < 30; $attempt++) {
@@ -224,18 +221,15 @@ class GenerateSupplementaryFlights extends Command
                 return [$lat, $lon];
             }
         }
-        // Fallback: the station's own coordinate always satisfies containsPoint().
+        // ako ne uspije, uzima se lokacija same postaje
         return [(float) $station->latitude, (float) $station->longitude];
     }
 
-    /**
-     * Back-and-forth patrol path around $center, entirely re-validated against
-     * the station's territory point by point (rule 4) — climb/cruise/descent
-     * phases, same shape as the existing border/river seeders.
-     */
+    // Putanja leta tamo-amo oko zadane točke, svaka točka unutar područja postaje,
+    // s fazama penjanja, leta i spuštanja
     private function generateRoute(BorderPoliceStation $station, array $center, Carbon $start, int $durationMinutes): array
     {
-        $pointCount = max(8, (int) round($durationMinutes * 60 / 10)); // ~1 point per 10s
+        $pointCount = max(8, (int) round($durationMinutes * 60 / 10)); // otprilike jedna točka svakih 10 s
         $interval   = 10;
         $legKm      = 0.8 + $this->rng->getInt(0, 100) / 100 * 1.6;
         $bearing    = $this->rng->getInt(0, 359) * M_PI / 180;
@@ -243,7 +237,7 @@ class GenerateSupplementaryFlights extends Command
         $endLat = $center[0] + ($legKm / 111.0) * cos($bearing);
         $endLon = $center[1] + ($legKm / (111.0 * max(cos(deg2rad($center[0])), 0.2))) * sin($bearing);
 
-        // Clamp the far end back into the territory if the leg overshot it.
+        // ako krajnja točka izađe iz područja, vraća se unutra
         if (!$station->containsPoint($endLat, $endLon)) {
             $endLat = $center[0] + ($legKm * 0.3 / 111.0) * cos($bearing);
             $endLon = $center[1] + ($legKm * 0.3 / (111.0 * max(cos(deg2rad($center[0])), 0.2))) * sin($bearing);
@@ -274,7 +268,7 @@ class GenerateSupplementaryFlights extends Command
                 $frac = $perLeg > 1 ? $s / ($perLeg - 1) : 0;
                 $lat = $a[0] + ($b[0] - $a[0]) * $frac;
                 $lon = $a[1] + ($b[1] - $a[1]) * $frac;
-                // Small jitter, re-clamped to stay inside the territory.
+                // malo odstupanje, ali i dalje unutar područja
                 $jLat = $lat + ($this->rng->getInt(-100, 100) / 100) * 0.0003;
                 $jLon = $lon + ($this->rng->getInt(-100, 100) / 100) * 0.0003;
                 if (!$station->containsPoint($jLat, $jLon)) {
@@ -323,18 +317,13 @@ class GenerateSupplementaryFlights extends Command
         ];
     }
 
-    /**
-     * Roughly 66% none / 25% one / 9% multiple, matching the existing
-     * dataset's ratio exactly (rules 7-9). Every detection is placed AT an
-     * actual GPX point already on this route (rule 12: temporally within the
-     * flight, spatially on the route, same station) — never at an
-     * independent random background location (rule 14).
-     */
+    // Otprilike 66 % letova bez detekcije, 25 % s jednom i 9 % s više detekcija.
+    // Svaka detekcija postavlja se na stvarnu točku putanje leta.
     private function maybeGenerateDetections(array $points, Carbon $flightStart): array
     {
-        $roll = $this->rng->getInt(1, 1000) / 10; // 0.0-100.0
+        $roll = $this->rng->getInt(1, 1000) / 10; // od 0 do 100
         if ($roll > 34.0) {
-            return []; // ~66% of flights: no detection (rule 13)
+            return []; // oko 66 % letova nema detekciju
         }
 
         $countRoll = $this->rng->getInt(1, 1000) / 10;
@@ -343,7 +332,7 @@ class GenerateSupplementaryFlights extends Command
         $detections = [];
         $usedIdx = [];
         for ($i = 0; $i < $n; $i++) {
-            $idx = $this->rng->getInt(1, count($points) - 2); // avoid the climb/descent endpoints
+            $idx = $this->rng->getInt(1, count($points) - 2); // bez točaka penjanja i spuštanja
             if (in_array($idx, $usedIdx, true)) {
                 continue;
             }
@@ -388,9 +377,7 @@ class GenerateSupplementaryFlights extends Command
         return $r * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 
-    /**
-     * Rule 20: verify spatial/temporal consistency of everything just created.
-     */
+    // Provjera jesu li svi novi zapisi prostorno i vremenski ispravni
     private function verifyConsistency(): void
     {
         $this->info('Provjera konzistentnosti...');

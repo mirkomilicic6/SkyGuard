@@ -7,7 +7,7 @@
 
 @section('content')
 
-{{-- ── KPI cards ─────────────────────────────────────────────────────────── --}}
+{{-- Osnovni pokazatelji --}}
 <div class="an-kpi-grid mb-4">
 
     <div class="db-kpi-card db-kpi-gold">
@@ -50,7 +50,7 @@
 
 </div>
 
-{{-- ── Spatial density (heatmap + individual detections + routes + zones) ── --}}
+{{-- Prostorna gustoća (toplinska karta, detekcije, putanje letova, granice) --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -61,7 +61,7 @@
         </div>
     </div>
 
-    {{-- Filters ------------------------------------------------------------ --}}
+    {{-- Filteri --}}
     <div class="sp-filters">
         @if($administrations)
         <select id="spAdministration" class="form-control form-control-sm">
@@ -118,7 +118,7 @@
         <button id="spReset" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></button>
     </div>
 
-    {{-- Layer toggles + heat params ----------------------------------------- --}}
+    {{-- Uključivanje slojeva i postavke toplinske karte --}}
     <div class="sp-controls">
         <div class="sp-layers">
             <label><input type="checkbox" id="layerHeat" checked> Heatmapa</label>
@@ -138,7 +138,7 @@
         <div id="spatialMap" style="height:480px; border-radius:0 0 12px 12px;"></div>
     </div>
 
-    {{-- Legend ---------------------------------------------------------------- --}}
+    {{-- Legenda --}}
     <div class="sp-legend">
         <span>Niska gustoća</span>
         <div class="sp-legend-bar"></div>
@@ -146,7 +146,7 @@
     </div>
 </div>
 
-{{-- ── Charts row 1: type + hour ────────────────────────────────────────── --}}
+{{-- Grafovi: vrsta i sat --}}
 <div class="row mb-4">
     <div class="col-md-5">
         <div class="db-card h-100">
@@ -170,7 +170,7 @@
     </div>
 </div>
 
-{{-- ── Charts row 2: weekday + monthly trend ───────────────────────────── --}}
+{{-- Grafovi: dan u tjednu i kretanje po mjesecima --}}
 <div class="row mb-4">
     <div class="col-md-5">
         <div class="db-card h-100">
@@ -194,7 +194,7 @@
     </div>
 </div>
 
-{{-- ── Charts row 3: source + station ──────────────────────────────────── --}}
+{{-- Grafovi: izvor i postaja --}}
 <div class="row mb-4">
     <div class="col-md-5">
         <div class="db-card">
@@ -282,7 +282,7 @@
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script>
-// ── Spatial density map ────────────────────────────────────────────────────
+// Karta prostorne gustoće
 const spatialMap = L.map('spatialMap').setView([45.1, 18.0], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
@@ -300,12 +300,8 @@ function spWeight(p) {
     return document.getElementById('paramWeightByEntities').checked ? Math.max(1, p.entity_count) : 1;
 }
 
-// Estimate the peak local density in the *currently loaded* set by binning
-// points into a pixel-space grid (sized to the heat radius, at the map's
-// current projection/zoom) and taking the busiest cell's summed weight.
-// This is what "isolated = low, overlap = red, normalised to the active
-// set's own peak" (points 1-3 of the spec) actually means numerically —
-// without it, `max` is just a guess and single points can hit full red.
+// najveća lokalna gustoća u učitanim podacima: točke se grupiraju u ćelije veličine polumjera
+// toplinske karte, pa je crvena boja samo tamo gdje se točke stvarno preklapaju
 function computeAutoMax(points) {
     const radius = parseFloat(document.getElementById('paramRadius').value) || 35;
     const cell = Math.max(radius, 10);
@@ -327,8 +323,7 @@ function renderHeat() {
     const blur   = parseFloat(document.getElementById('paramBlur').value) || 25;
     const max    = parseFloat(document.getElementById('paramMax').value) || 1;
     const pts = spData.points.map(p => [p.lat, p.lon, spWeight(p)]);
-    // maxZoom must track the map's actual zoom or points render almost
-    // invisibly faint at a wide view (same fix as the KDE/Analytics bug).
+    // maxZoom prati trenutni zoom karte, inače su točke kod udaljenog prikaza jedva vidljive
     heatLayer = L.heatLayer(pts, {
         radius, blur, max, maxZoom: spatialMap.getZoom(),
         gradient: { 0.2: '#4575b4', 0.45: '#74add1', 0.65: '#fdae61', 0.82: '#f46d43', 1.0: '#d73027' }
@@ -433,7 +428,7 @@ document.getElementById('paramRadius').addEventListener('change', () => {
     document.getElementById(id).addEventListener('change', renderHeat);
 });
 
-// Administration → station cascading filter (super admin only)
+// odabir uprave pa postaje (samo glavni administrator)
 const spAdminSelect = document.getElementById('spAdministration');
 if (spAdminSelect) {
     const spStationSelect = document.getElementById('spStation');
@@ -452,7 +447,7 @@ if (spAdminSelect) {
 
 loadSpatialData();
 
-// ── Chart defaults ───────────────────────────────────────────────────────────
+// Zajedničke postavke grafova
 const tooltip = {
     backgroundColor: '#0d2460',
     borderColor: 'rgba(240,192,64,0.4)',
@@ -473,7 +468,7 @@ function barScales(yLabel) {
     };
 }
 
-// ── By type (doughnut) ───────────────────────────────────────────────────────
+// Po vrsti
 new Chart(document.getElementById('chartType'), {
     type: 'doughnut',
     data: {
@@ -494,7 +489,7 @@ new Chart(document.getElementById('chartType'), {
     }
 });
 
-// ── By hour ──────────────────────────────────────────────────────────────────
+// Po satu
 new Chart(document.getElementById('chartHour'), {
     type: 'bar',
     data: {
@@ -514,7 +509,7 @@ new Chart(document.getElementById('chartHour'), {
     }
 });
 
-// ── By weekday ───────────────────────────────────────────────────────────────
+// Po danu u tjednu
 new Chart(document.getElementById('chartDow'), {
     type: 'bar',
     data: {
@@ -534,7 +529,7 @@ new Chart(document.getElementById('chartDow'), {
     }
 });
 
-// ── Monthly trend (line) ─────────────────────────────────────────────────────
+// Po mjesecima
 const monthCtx  = document.getElementById('chartMonth').getContext('2d');
 const monthGrad = monthCtx.createLinearGradient(0, 0, 0, 260);
 monthGrad.addColorStop(0,   'rgba(240,192,64,0.35)');
@@ -563,7 +558,7 @@ new Chart(monthCtx, {
     }
 });
 
-// ── By source (doughnut) ─────────────────────────────────────────────────────
+// Po izvoru
 new Chart(document.getElementById('chartSource'), {
     type: 'doughnut',
     data: {
@@ -584,7 +579,7 @@ new Chart(document.getElementById('chartSource'), {
     }
 });
 
-// ── By station (bar) ─────────────────────────────────────────────────────────
+// Po postaji
 new Chart(document.getElementById('chartStation'), {
     type: 'bar',
     data: {

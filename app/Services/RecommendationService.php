@@ -10,15 +10,9 @@ class RecommendationService
     private const DOW_LABELS = [1 => 'nedjeljom', 2 => 'ponedjeljkom', 3 => 'utorkom', 4 => 'srijedom',
         5 => 'četvrtkom', 6 => 'petkom', 7 => 'subotom'];
 
-    /**
-     * Four-category surveillance recommendation for DBSCAN hotspot zones
-     * (K1, K2...), driven by the trained model's predicted probability
-     * — a deliberate, explicit exception to "RecommendationService doesn't
-     * talk to ml-service": the model's probability IS the input here, per
-     * the academic-pipeline requirement. A zone below the minimum-flights/
-     * minutes guardrail is always "insufficient_data"; the model's
-     * probability is never allowed to force a reduction on its own.
-     */
+    // Preporuka nadzora za DBSCAN žarišta (pojačati, zadržati, razmotriti smanjenje, premalo podataka).
+    // Temelji se na indeksu rizika iz servisa za strojno učenje.
+    // Žarište bez dovoljno letova i minuta nadzora uvijek dobiva "premalo podataka".
     public function forDbscanZones(?int $administrationId = null, ?int $stationId = null,
                                    ?int $dow = null, ?int $block = null): Collection
     {
@@ -27,8 +21,7 @@ class RecommendationService
             'administration_id' => $administrationId,
             'station_id'        => $administrationId ? null : $stationId,
         ]);
-        // dow/block can legitimately be 0 (Monday / 00:00–04:00), so they're
-        // filtered on null, not on falsiness like the scope ids above.
+        // dan i blok mogu biti 0 (ponedjeljak, 00-04 h), pa se provjerava null, a ne prazna vrijednost
         $predictionParam = $param + array_filter(['dow' => $dow, 'block' => $block], fn ($v) => $v !== null);
 
         try {
@@ -53,9 +46,7 @@ class RecommendationService
             } elseif ($pred['probability'] >= 70) {
                 $type = 'increase';
             } elseif ($pred['probability'] <= 25) {
-                // Guardrail already applied above — a low-probability zone
-                // only ever reaches "consider_reduction" once it has proven
-                // it has enough flights/minutes to trust that low reading.
+                // smanjenje je moguće samo ako žarište ima dovoljno letova i minuta nadzora (provjereno iznad)
                 $type = 'consider_reduction';
             } else {
                 $type = 'maintain';
@@ -116,7 +107,7 @@ class RecommendationService
         };
     }
 
-    /** Croatian number agreement: 1 → "zabilježena je 1 detekcija", 2–4 → "zabilježene su", otherwise "zabilježeno je". */
+    // Ispravan oblik riječi uz broj: 1 detekcija, 2-4 detekcije, 5 i više detekcija
     private function detectionsPhrase(int $n): string
     {
         $mod10 = $n % 10;

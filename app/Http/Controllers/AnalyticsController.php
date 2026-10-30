@@ -25,14 +25,14 @@ class AnalyticsController extends Controller
         $flightBase = Flight::query()
             ->when($scopedIds !== null, fn($q) => $q->whereIn('station_id', $scopedIds));
 
-        // Summary stats
+        // osnovni brojevi
         $total          = (clone $base)->count();
         $totalEntities  = (int) (clone $base)->sum('entity_count');
         $totalFlights   = (clone $flightBase)->count();
         $totalMinutes   = (int) (clone $flightBase)->sum('duration_minutes');
         $totalHours     = round($totalMinutes / 60, 1);
 
-        // By type
+        // po vrsti
         $byType = (clone $base)
             ->select('detection_type', DB::raw('SUM(entity_count) as total'))
             ->groupBy('detection_type')
@@ -47,7 +47,7 @@ class AnalyticsController extends Controller
             'colors' => collect($typeColors)->values(),
         ];
 
-        // By source
+        // po izvoru
         $bySource = (clone $base)
             ->select('source', DB::raw('COUNT(*) as cnt'))
             ->groupBy('source')
@@ -62,7 +62,7 @@ class AnalyticsController extends Controller
             'colors' => collect($sourceColors)->values(),
         ];
 
-        // By hour of day
+        // po satu u danu
         $byHour = (clone $base)
             ->select(DB::raw('HOUR(detected_at) as hr'), DB::raw('COUNT(*) as cnt'))
             ->groupBy('hr')
@@ -73,7 +73,7 @@ class AnalyticsController extends Controller
             'data'   => collect(range(0, 23))->map(fn($h) => (int) ($byHour[$h] ?? 0)),
         ];
 
-        // By day of week (MySQL DAYOFWEEK: 1=Sun,2=Mon…)
+        // po danu u tjednu (MySQL DAYOFWEEK: 1 = nedjelja)
         $byDow = (clone $base)
             ->select(DB::raw('DAYOFWEEK(detected_at) as dow'), DB::raw('COUNT(*) as cnt'))
             ->groupBy('dow')
@@ -85,7 +85,7 @@ class AnalyticsController extends Controller
             'data'   => collect($dowLabels)->keys()->map(fn($k) => (int) ($byDow[$k] ?? 0)),
         ];
 
-        // Monthly trend — last 12 months
+        // kretanje po mjesecima, zadnjih 12 mjeseci
         $since = Carbon::now()->subMonths(11)->startOfMonth();
         $byMonth = (clone $base)
             ->where('detected_at', '>=', $since)
@@ -102,7 +102,7 @@ class AnalyticsController extends Controller
             'data'   => $months->map(fn($ym) => (int) ($byMonth[$ym] ?? 0)),
         ];
 
-        // By station
+        // po postaji
         $byStation = (clone $base)
             ->join('border_police_stations', 'border_police_stations.id', '=', 'detections.station_id')
             ->select('border_police_stations.name', DB::raw('COUNT(*) as cnt'))
@@ -115,14 +115,14 @@ class AnalyticsController extends Controller
             'data'   => $byStation->values(),
         ];
 
-        // Flights with vs. without detections
+        // letovi s detekcijom i bez nje
         $flightsWithDetections    = (clone $flightBase)->has('detections')->count();
         $flightsWithoutDetections = $totalFlights - $flightsWithDetections;
 
-        // Average detections per flight-hour
+        // prosječan broj detekcija po satu leta
         $avgDetectionsPerFlightHour = $totalHours > 0 ? round($total / $totalHours, 2) : 0;
 
-        // ── Filter option lists for the spatial-density section ────────────────
+        // popisi za filtere karte prostorne gustoće
         $user         = auth()->user();
         $isSuperAdmin = $user->station_id === null;
 
@@ -144,12 +144,8 @@ class AnalyticsController extends Controller
         ));
     }
 
-    /**
-     * JSON data for the spatial-density map: filtered detections (for the
-     * density heatmap and the individual-detection layer), GPX routes for
-     * flights in the same station/period scope, and station boundaries.
-     * Historical density only — no risk scoring of any kind lives here.
-     */
+    // Podaci za kartu prostorne gustoće: detekcije, putanje letova i granice postaja.
+    // Samo povijesni podaci, bez procjene rizika.
     public function spatialData(Request $request)
     {
         $scopedIds  = $this->scopedStationIds();
@@ -178,13 +174,8 @@ class AnalyticsController extends Controller
             'detected_at'    => $d->detected_at->translatedFormat('d.m.Y H:i'),
         ])->values();
 
-        // Routes: GPX for flights in the same station+period scope. Type/
-        // source/time-block are detection-level attributes and don't apply
-        // to flights, so only station+period narrow this layer. Capped to
-        // the most recent matches — with tens of thousands of flights now
-        // in the dataset, eager-loading every GPX point for every match
-        // exhausted the web request's memory limit (same issue fixed on the
-        // dashboard's "Pregled cijele mreže" map — see that commit).
+        // putanje letova filtriraju se samo po postaji i razdoblju,
+        // a prikazuje se ograničen broj najnovijih letova jer bi svi letovi potrošili svu memoriju
         $routesQuery = Flight::query()
             ->when($scopedIds !== null, fn($q) => $q->whereIn('station_id', $scopedIds))
             ->when($request->filled('station_id'), fn($q) => $q->where('station_id', $request->integer('station_id')))
@@ -203,7 +194,7 @@ class AnalyticsController extends Controller
             ->filter(fn($pts) => $pts->count() > 1)
             ->values();
 
-        // Zones: station boundaries in scope (or just the one selected).
+        // granice postaja u opsegu korisnika ili samo odabrane postaje
         $zones = BorderPoliceStation::query()
             ->when($scopedIds !== null, fn($q) => $q->whereIn('id', $scopedIds))
             ->when($request->filled('station_id'), fn($q) => $q->where('id', $request->integer('station_id')))

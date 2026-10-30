@@ -5,16 +5,10 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    /**
-     * Data-only migration: fill station_id on existing detections from
-     * whatever it can be inferred from, in order of confidence. Rows that
-     * still can't be resolved (bare manual entries with no flight/camera and
-     * created by a super admin) are left null — the same "null = global"
-     * convention already used on users/drones/flights.
-     */
+    // Popunjava postaju na postojećim detekcijama iz onoga što je poznato, redom po pouzdanosti
     public function up(): void
     {
-        // 1) From the linked flight's station.
+        // 1) postaja leta
         DB::statement(<<<'SQL'
             UPDATE detections d
             INNER JOIN flights f ON f.id = d.flight_id
@@ -22,7 +16,7 @@ return new class extends Migration
             WHERE d.station_id IS NULL AND f.station_id IS NOT NULL
         SQL);
 
-        // 2) From the linked hunting camera's station (camera_id still exists at this point).
+        // 2) postaja lovačke kamere
         DB::statement(<<<'SQL'
             UPDATE detections d
             INNER JOIN hunting_cameras hc ON hc.id = d.camera_id
@@ -30,7 +24,7 @@ return new class extends Migration
             WHERE d.station_id IS NULL AND hc.station_id IS NOT NULL
         SQL);
 
-        // 3) Best-effort fallback: the creating user's own station.
+        // 3) postaja korisnika koji je unio detekciju
         DB::statement(<<<'SQL'
             UPDATE detections d
             INNER JOIN users u ON u.id = d.user_id
@@ -41,7 +35,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Data-only migration — nothing structural to reverse. Leaving the
-        // backfilled station_id values in place on rollback is harmless.
+        // mijenjaju se samo podaci, pa nema što vraćati
     }
 };

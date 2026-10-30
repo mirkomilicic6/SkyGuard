@@ -12,27 +12,16 @@ use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
-/**
- * Builds a synthetic flights+detections dataset for the thesis ML pipeline,
- * replacing whatever is currently in `flights`/`gpx_points`/`detections`.
- *
- * Design goals agreed with the thesis advisor scenario (see conversation):
- *  - Realistic source mix: 40% drone, 35% trail camera, 25% ground/manual.
- *  - ~Half of all flights carry zero detections ("not seen" ≠ "nothing
- *    happened") — the rest carry a variable, not fixed, count.
- *  - Spatial pattern per station: 60% in a couple of persistent hotspots,
- *    25% scattered, 15% in a temporary hotspot that is only "active" for a
- *    contiguous window within the year (appears/disappears). Trail cameras
- *    instead use their own already-fixed real coordinates.
- *  - Temporal pattern: all months/hours represented, but uneven — quiet
- *    baseline days plus a handful of pronounced night- or weekend-skewed
- *    "episodes" per station.
- *  - Referential integrity: drone detections always sit on their flight's
- *    actual path and inside its time window; every detection's station
- *    matches its flight/camera's station; created_by always resolves to a
- *    real user via a station → administration → super-admin fallback chain
- *    (never invented).
- */
+// Generira sintetički skup letova i detekcija za strojno učenje u radu.
+// Briše postojeće letove, GPS točke i detekcije i stvara nove.
+// Pravila:
+//  - izvori detekcija: 40 % dron, 35 % lovačke kamere, 25 % ophodnje i ručni unos
+//  - velik dio letova nema nijednu detekciju (ništa nije uočeno ne znači da se ništa nije dogodilo)
+//  - po postaji: 60 % detekcija u stalnim žarištima, 25 % raspršeno, 15 % u privremenom žarištu
+//  - detekcije s kamera nalaze se na stvarnim lokacijama kamera
+//  - zastupljeni su svi mjeseci i sati, uz mirne dane i nekoliko razdoblja pojačane noćne ili vikend aktivnosti
+//  - detekcija s drona uvijek je na putanji i unutar vremena svog leta, a postaja odgovara postaji leta ili kamere
+//  - created_by je uvijek stvarni korisnik (postaja, uprava, a na kraju glavni administrator)
 class GenerateSyntheticDataset extends Command
 {
     protected $signature = 'dataset:generate-synthetic
@@ -44,7 +33,7 @@ class GenerateSyntheticDataset extends Command
 
     protected $description = 'Replace flights/gpx_points/detections with a designed synthetic dataset (border-anchored flights, 3 detection sources, hotspot + episodic patterns)';
 
-    /** Real-world station-town coordinates, same list as flights:generate-border. */
+    // Koordinate mjesta u kojima su postaje (isti popis kao u flights:generate-border)
     private const STATION_COORDS = [
         'PGP Slunj' => [45.1122, 15.5828], 'PGP Cetingrad' => [45.0333, 15.7500],
         'PGP Vojnić' => [45.3086, 15.7167], 'PGP Maljevac' => [44.9800, 15.7500],
@@ -64,11 +53,11 @@ class GenerateSyntheticDataset extends Command
     ];
 
     private array $segments = [];
-    private array $stationCtx = []; // station_id => context array (anchors, calendar, etc.)
+    private array $stationCtx = []; // postaja => njezina žarišta, kalendar aktivnosti i sl.
     private \DateTimeImmutable $from;
     private \DateTimeImmutable $to;
     private ?User $superAdmin = null;
-    private array $administrationAdmins = []; // administration_id => User|null
+    private array $administrationAdmins = []; // uprava => korisnik ili null
 
     public function handle(): int
     {
@@ -175,17 +164,16 @@ class GenerateSyntheticDataset extends Command
         return $p1 < $p2 ? $n1 : $n2;
     }
 
-    /** Builds anchors, intensity calendar and episode windows for one station. */
+    // Za jednu postaju određuje žarišta, kalendar aktivnosti i razdoblja pojačane aktivnosti
     private function buildStationContext(BorderPoliceStation $station, $stationCameras): void
     {
         $coord = self::STATION_COORDS[$station->name] ?? [(float) $station->latitude, (float) $station->longitude];
         [$borderLat, $borderLon, $tangent] = $this->nearestBorderPoint($coord[0], $coord[1]);
         $normal = $this->inwardNormal($borderLat, $borderLon, $tangent, $coord[0], $coord[1]);
 
-        $activityWeight = mt_rand(60, 220) / 100; // 0.6 .. 2.2, station "busyness"
+        $activityWeight = mt_rand(60, 220) / 100; // od 0,6 do 2,2, koliko je postaja aktivna
 
-        // Two persistent hotspots + one temporary (appears/disappears) hotspot,
-        // each expressed as [sweepKm along tangent, offsetKm inland].
+        // dva stalna žarišta i jedno privremeno, svako zadano kao [km uz granicu, km od granice prema unutrašnjosti]
         $persistent = [
             [mt_rand(-200, 200) / 100, mt_rand(150, 350) / 100],
             [mt_rand(-200, 200) / 100, mt_rand(150, 350) / 100],
@@ -198,8 +186,7 @@ class GenerateSyntheticDataset extends Command
             'end' => $tempStartDay + $tempLenDays,
         ];
 
-        // 2-4 episode windows across the year: short bursts of elevated,
-        // night- or weekend-skewed activity, on top of a quiet baseline.
+        // 2 do 4 kratka razdoblja pojačane noćne ili vikend aktivnosti tijekom godine
         $episodes = [];
         $numEpisodes = mt_rand(2, 4);
         for ($i = 0; $i < $numEpisodes; $i++) {
@@ -246,7 +233,7 @@ class GenerateSyntheticDataset extends Command
         ];
     }
 
-    /** Resolves a real-world lat/lon for a given anchor mode on a given day offset. */
+    // Koordinate za zadanu vrstu lokacije (žarište, raspršeno) na zadani dan
     private function anchorPoint(array $ctx, int $dayOffset, ?string &$modeOut = null): array
     {
         $roll = mt_rand(1, 100);
@@ -283,7 +270,7 @@ class GenerateSyntheticDataset extends Command
         ];
     }
 
-    /** Weighted-random day offset (0..totalDays) favouring higher-weight days. */
+    // Nasumični dan, s većom vjerojatnošću za dane s većom aktivnošću
     private function sampleDayOffset(array $ctx): int
     {
         $weights = $ctx['dayWeights'];
@@ -299,7 +286,7 @@ class GenerateSyntheticDataset extends Command
         return $ctx['totalDays'];
     }
 
-    /** Hour-of-day sample, night-biased; more so during a 'night' episode day. */
+    // Nasumični sat, češće noću, posebno u razdobljima noćne aktivnosti
     private function sampleHour(?string $episodeType, float $nightBias = 0.55): int
     {
         $bias = $episodeType === 'night' ? 0.82 : ($episodeType === 'weekend' ? $nightBias * 0.85 : $nightBias);
@@ -334,7 +321,7 @@ class GenerateSyntheticDataset extends Command
         };
     }
 
-    /** Resolves created_by: station viewer → local admin → administration admin → pilot → super admin. */
+    // Tko je unio zapis: analitičar postaje, administrator, pilot ili na kraju glavni administrator
     private function resolveCreatedBy(array $ctx): ?int
     {
         $candidate = $ctx['viewer'] ?? $ctx['localAdmin']
@@ -343,22 +330,11 @@ class GenerateSyntheticDataset extends Command
         return $candidate?->id;
     }
 
-    /**
-     * Generates every flight AND its drone detections in one streaming pass:
-     * a flight's GPX points are built, inserted, used to sample that same
-     * flight's drone detections, then discarded before moving to the next
-     * flight. At low hundreds of flights it was fine to hold the whole
-     * dataset (points included) in memory for a second pass — at tens of
-     * thousands of flights that blew PHP's memory limit with no useful
-     * error (a hard OOM kill, not a catchable exception). Exact per-flight
-     * drone-detection counts still hit the target precisely: a cheap first
-     * pass decides station/time/anchor/wants-detections for every flight
-     * (lightweight scalars only, no points), scales those into an exact
-     * largest-remainder count per flight, and the second (streaming) pass
-     * just realises that plan.
-     *
-     * @return array{0: int, 1: int, 2: int} [flightsGenerated, droneDetectionsGenerated, flightsWithDetections]
-     */
+    // Generira letove i detekcije s drona.
+    // Prvo se za svaki let odrede samo osnovni podaci (postaja, vrijeme, broj detekcija),
+    // a zatim se let po let grade GPS točke, upisuju u bazu i odmah otpuštaju,
+    // jer bi sve točke odjednom potrošile svu memoriju.
+    // Vraća [broj letova, broj detekcija s drona, broj letova s detekcijom].
     private function generateFlightsAndDrone(int $targetFlights, int $targetDroneDetections, int $activePct = 50): array
     {
         $piloted = array_filter($this->stationCtx, fn ($ctx) => $ctx['pilot'] !== null && $ctx['drones']->isNotEmpty());
@@ -376,8 +352,7 @@ class GenerateSyntheticDataset extends Command
             $counts[$stationId] = max($floor, (int) round($targetFlights * $w / $totalWeight));
             $assigned += $counts[$stationId];
         }
-        // Largest-remainder-ish trim/pad to land close to target, bounded so a
-        // target too small to honour $floor across every station can't spin forever.
+        // usklađivanje broja letova s detekcijom s ciljem, uz ograničen broj pokušaja
         $stationIds = array_keys($counts);
         $guard = 0;
         $maxGuard = count($stationIds) * 1000 + 1000;
@@ -391,14 +366,14 @@ class GenerateSyntheticDataset extends Command
             $counts[$sid]++; $assigned++;
         }
 
-        // Pass 1 — lightweight plan per flight (scalars only, no GPX points).
+        // 1. prolaz: plan za svaki let, bez GPS točaka
         $plans = [];
         foreach ($counts as $stationId => $count) {
             $ctx = $this->stationCtx[$stationId];
             for ($i = 0; $i < $count; $i++) {
                 $dayOffset = $this->sampleDayOffset($ctx);
                 $episodeType = $ctx['dayWeights'][$dayOffset]['episode'];
-                $hour = $this->sampleHour($episodeType, 0.35); // flights skew less to pure night than passive sensors
+                $hour = $this->sampleHour($episodeType, 0.35); // letovi su manje vezani uz noć nego kamere
                 $mode = null;
                 [$anchorLat, $anchorLon] = $this->anchorPoint($ctx, $dayOffset, $mode);
 
@@ -414,8 +389,7 @@ class GenerateSyntheticDataset extends Command
             }
         }
 
-        // Exact per-flight drone-detection count via largest-remainder scaling
-        // (cheap — just scalars — computed before any points exist).
+        // točan broj detekcija po letu (metoda najvećeg ostatka)
         $eligiblePlanIdx = [];
         $raw = [];
         foreach ($plans as $idx => $p) {
@@ -432,8 +406,7 @@ class GenerateSyntheticDataset extends Command
             $droneCountByPlan[$planIdx] = $scaled[$j];
         }
 
-        // Pass 2 — stream: build + insert each flight, its GPX points and its
-        // drone detections, then discard the points before the next flight.
+        // 2. prolaz: let po let, upis točaka i detekcija pa otpuštanje točaka
         $purposes = ['Redovna granična patrola', 'Nadzor graničnog pojasa', 'Preventivna kontrola prijelaza', 'Praćenje kretanja uz granicu'];
         $types = ['vehicle' => 35, 'group' => 30, 'person' => 25, 'other' => 10];
 
@@ -465,7 +438,7 @@ class GenerateSyntheticDataset extends Command
                 for ($k = 0; $k < $n; $k++) {
                     $pp = $points[array_rand($points)];
                     $bearing = mt_rand() / mt_getrandmax() * 2 * M_PI;
-                    $jitterKm = mt_rand(5, 20) / 100; // 50-200m off the flight path
+                    $jitterKm = mt_rand(5, 20) / 100; // 50 do 200 m od putanje leta
                     $lat = (float) $pp['latitude'] + (sin($bearing) * $jitterKm) / 111.0;
                     $lon = (float) $pp['longitude'] + (cos($bearing) * $jitterKm) / (111.0 * cos(deg2rad((float) $pp['latitude'])));
                     $type = $this->weightedPick($types);
@@ -585,7 +558,7 @@ class GenerateSyntheticDataset extends Command
 
         $types = ['person' => 45, 'group' => 25, 'vehicle' => 15, 'other' => 15];
         $totalWeight = array_sum(array_column($cameraList, 'weight'));
-        $lastEventAt = []; // camera_id => DateTime, to avoid near-duplicate frame-spam
+        $lastEventAt = []; // kamera => vrijeme zadnje detekcije, da se izbjegnu gotovo iste detekcije
 
         $rows = [];
         $attempts = 0;
@@ -606,15 +579,14 @@ class GenerateSyntheticDataset extends Command
             $hour = $this->sampleHour($episodeType, 0.65);
             $time = $this->from->modify("+{$dayOffset} days")->setTime($hour, mt_rand(0, 59), mt_rand(0, 59));
 
-            // Guard against spamming the same camera within a few minutes
-            // (e.g. one real sighting split across many video frames).
+            // ista kamera ne bilježi novu detekciju unutar nekoliko minuta
             if (isset($lastEventAt[$camera->id]) && abs($time->getTimestamp() - $lastEventAt[$camera->id]) < 600) {
                 continue;
             }
             $lastEventAt[$camera->id] = $time->getTimestamp();
 
             $bearing = mt_rand() / mt_getrandmax() * 2 * M_PI;
-            $jitterKm = mt_rand(1, 4) / 100; // 10-40m GPS imprecision around the fixed camera
+            $jitterKm = mt_rand(1, 4) / 100; // 10 do 40 m odstupanja od lokacije kamere
             $lat = (float) $camera->latitude + (sin($bearing) * $jitterKm) / 111.0;
             $lon = (float) $camera->longitude + (cos($bearing) * $jitterKm) / (111.0 * cos(deg2rad((float) $camera->latitude)));
             $type = $this->weightedPick($types);
@@ -696,7 +668,7 @@ class GenerateSyntheticDataset extends Command
         return array_key_first($weights);
     }
 
-    /** Scales a list of raw positive-int weights so they sum exactly to $target (largest-remainder method). */
+    // Raspodjela cijelih brojeva prema težinama tako da zbroj bude točno $target (metoda najvećeg ostatka)
     private function scaleToTarget(array $raw, int $target): array
     {
         $sum = array_sum($raw);

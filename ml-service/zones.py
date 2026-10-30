@@ -1,13 +1,6 @@
-"""
-DBSCAN-hotspot ("zone") pipeline: stable K1..KN zone labeling, zone-vs-flight
-comparison, a real (zone, day, time-block) supervised dataset built from
-actual historical outcomes (no synthetic background sampling), a 4-model
-comparison with a chronological train/test split, and probability
-predictions from the best-performing model.
-
-Kept separate from main.py (which already covers the risk-grid/bandit/KDE
-pipelines) purely for file size / readability.
-"""
+# Postupak s DBSCAN žarištima: označavanje žarišta (K1, K2, ...), povezivanje žarišta s letovima,
+# izgradnja skupa podataka (žarište*dan*vremenski blok), usporedba četiri modela
+# s kronološkom podjelom podataka i procjena rizika najboljim modelom.
 import numpy as np
 import pandas as pd
 from sklearn.cluster import DBSCAN
@@ -19,9 +12,7 @@ from sklearn.utils.class_weight import compute_sample_weight
 
 from ml_common import evaluate_model
 
-# Mirrors config('surveillance.time_blocks') in the Laravel app (config/surveillance.php).
-# Keep these two definitions in sync by hand — there is no shared config store
-# between the PHP and Python runtimes.
+# Vremenski blokovi, isti kao u config/surveillance.php u Laravelu (treba ih ručno uskladiti)
 TIME_BLOCKS = [
     {"label": "00:00–04:00", "start": 0, "end": 4},
     {"label": "04:00–08:00", "start": 4, "end": 8},
@@ -30,12 +21,13 @@ TIME_BLOCKS = [
     {"label": "16:00–20:00", "start": 16, "end": 20},
     {"label": "20:00–24:00", "start": 20, "end": 24},
 ]
-MIN_FLIGHTS_FOR_ZONE = 5  # mirrors config('surveillance.min_flights_for_zone')
+MIN_FLIGHTS_FOR_ZONE = 5  # isto kao min_flights_for_zone u config/surveillance.php
 
 DOW_LABELS_HR = {0: "ponedjeljkom", 1: "utorkom", 2: "srijedom", 3: "četvrtkom",
-                 4: "petkom", 5: "subotom", 6: "nedjeljom"}  # Python weekday(): 0=Mon..6=Sun
+                 4: "petkom", 5: "subotom", 6: "nedjeljom"}  # 0 = ponedjeljak
 
 
+# Vraća redni broj vremenskog bloka za zadani sat
 def _block_for_hour(hour: int) -> int:
     for i, b in enumerate(TIME_BLOCKS):
         if b["start"] <= hour < b["end"]:
@@ -43,24 +35,15 @@ def _block_for_hour(hour: int) -> int:
     return len(TIME_BLOCKS) - 1
 
 
-# ── Phase 1: stable DBSCAN zones ───────────────────────────────────────────────
+# 1. korak: izdvajanje žarišta
+# DBSCAN se pokreće nad svim detekcijama, a žarišta se označavaju K1, K2, ... prema broju detekcija.
+# point_zone_ids za svaku detekciju čuva oznaku žarišta (None ako ne pripada nijednom),
+# i dalje se koristi ta oznaka, a ne provjera udaljenosti od središta žarišta.
 def compute_zones(df: pd.DataFrame, eps_km: float = 2.0, min_samples: int = 3) -> dict:
-    """DBSCAN once over all current detections (df must have latitude/
-    longitude/type/count/hour/dow columns, i.e. main.get_detections()'s
-    output). Zones are labeled K1..KN by descending detection count — a
-    stable-enough identity for this dataset's scale, not a persisted zone
-    registry (a real production system would want the latter).
-
-    Also returns `point_zone_ids`: the exact zone id (or None for noise)
-    DBSCAN assigned to each row of `df`, in df's original row order. This
-    is the ONLY correct way to know which zone a detection belongs to —
-    downstream code must reuse it rather than re-deriving membership from
-    a circle-radius check against the zone centroid, which (being a
-    convex approximation of what can be a non-convex DBSCAN cluster) can
-    disagree with the real clustering by a point or two."""
     if len(df) < min_samples:
         return {"zones": [], "noise": [], "total_detections": len(df), "point_zone_ids": [None] * len(df)}
 
+    # haversine radi u radijanima, pa se i eps pretvara u radijane (polumjer Zemlje 6371 km)
     coords_rad = np.radians(df[["latitude", "longitude"]].values.astype(float))
     eps_rad = eps_km / 6371.0
     labels = DBSCAN(eps=eps_rad, min_samples=min_samples, metric="haversine").fit_predict(coords_rad)
@@ -78,6 +61,7 @@ def compute_zones(df: pd.DataFrame, eps_km: float = 2.0, min_samples: int = 3) -
         risk = min(100, int(len(grp) * 10 + avg_entities * 8 + total_count * 0.5))
         lat, lon = float(grp["latitude"].mean()), float(grp["longitude"].mean())
 
+        # najaktivniji dan i vremenski blok u žarištu
         dow_mode = int(grp["dow"].mode().iloc[0]) if grp["dow"].notna().any() else None
         blocks = grp["hour"].dropna().astype(int).map(_block_for_hour)
         most_active_block = int(blocks.mode().iloc[0]) if not blocks.empty else None
@@ -94,6 +78,7 @@ def compute_zones(df: pd.DataFrame, eps_km: float = 2.0, min_samples: int = 3) -
             "most_active_block": most_active_block,
         })
 
+    # oznake K1, K2, ... prema broju detekcija, od najvećeg
     raw.sort(key=lambda z: z["count"], reverse=True)
     zones = []
     raw_cid_to_kid = {}
@@ -102,28 +87,19 @@ def compute_zones(df: pd.DataFrame, eps_km: float = 2.0, min_samples: int = 3) -
         raw_cid_to_kid[z.pop("_raw_cid")] = z["id"]
         zones.append(z)
 
-    point_zone_ids = [raw_cid_to_kid.get(c) for c in labels]  # None stays None (noise, cid -1)
+    point_zone_ids = [raw_cid_to_kid.get(c) for c in labels]  # šum (-1) ostaje None
 
     noise_pts = df[df.cluster == -1][["latitude", "longitude"]].values.tolist()
     return {"zones": zones, "noise": noise_pts, "total_detections": len(df), "point_zone_ids": point_zone_ids}
 
 
-# ── Phase 2: zone vs. GPX flights ──────────────────────────────────────────────
+# 2. korak: žarišta i letovi
+# Za svako žarište: broj letova i sati nadzora, broj detekcija, detekcije po satu leta,
+# najaktivniji termin i trend (zadnjih 30 dana prema prethodnih 30).
+# flight_zone (koji let prolazi kroz koje žarište) računa se SQL upitom u main.py,
+# jer bi učitavanje svih GPS točaka u memoriju bilo presporo.
 def zone_flight_stats(zones: list, detections_df: pd.DataFrame, flights_meta: pd.DataFrame,
                        flight_zone: pd.DataFrame, recent_days: int = 30) -> list:
-    """Per zone: flights through it, surveillance hours, detections found,
-    the key detections-per-hour rate, activity timing, and a 30d/prev-30d
-    trend — the same shape of metric RecommendationService already computes
-    per station, just keyed by DBSCAN zone instead.
-
-    `detections_df` must already carry the exact per-row "zone" column that
-    `compute_zones()`'s `point_zone_ids` produced (see `_zone_pipeline_inputs`
-    in main.py) — detections have no other correct zone assignment, since
-    DBSCAN was run directly on them. `flight_zone` is the (zone, flight_id)
-    membership table computed in SQL by main.py's get_flight_zone_membership
-    — pulling every raw GPX point into pandas to compute this in Python
-    routinely exhausted ml-service's memory limit once the dataset reached
-    the low millions of points."""
     if not zones:
         return []
 
@@ -152,6 +128,7 @@ def zone_flight_stats(zones: list, detections_df: pd.DataFrame, flights_meta: pd
         entities_count = int(zdet["count"].sum())
         rate = round(detections_count / total_hours, 3) if total_hours > 0 else 0.0
 
+        # trend: zadnjih 30 dana u odnosu na prethodnih 30
         recent = zdet[zdet["detected_at"] >= now - pd.Timedelta(days=recent_days)]
         previous = zdet[(zdet["detected_at"] < now - pd.Timedelta(days=recent_days)) &
                          (zdet["detected_at"] >= now - pd.Timedelta(days=2 * recent_days))]
@@ -176,21 +153,12 @@ def zone_flight_stats(zones: list, detections_df: pd.DataFrame, flights_meta: pd
     return results
 
 
-# ── Phase 3: supervised (zone, day, block) dataset ─────────────────────────────
+# 3. korak: skup podataka za nadzirano učenje
+# Jedan redak za svaku kombinaciju žarišta, dana i vremenskog bloka kroz cijelo razdoblje.
+# Sva obilježja pomaknuta su za jedan dan unatrag, da model ne vidi ishod koji predviđa.
+# Oznaka je 1 ako je u tom žarištu u tom bloku stvarno zabilježena detekcija, inače 0.
 def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
                                  flights_meta: pd.DataFrame, flight_zone: pd.DataFrame) -> pd.DataFrame:
-    """One row per (zone, day, time-block) across the full data history.
-    Every feature is a cumulative/rolling stat *shifted back one day* so
-    nothing about the outcome being predicted leaks into its own features.
-    Label = a real detection actually happened in that zone during that
-    exact day+block (a genuine negative example otherwise — never a
-    synthetic random background point).
-
-    `detections_df` must already carry the exact per-row "zone" column
-    from `compute_zones()`'s `point_zone_ids` (see `_zone_pipeline_inputs`
-    in main.py) — same reasoning as `zone_flight_stats()` above. `flight_zone`
-    is the (zone, flight_id) membership table computed in SQL — see the note
-    on `zone_flight_stats()` above for why that matters at this data volume."""
     if not zones:
         return pd.DataFrame()
 
@@ -222,10 +190,12 @@ def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
         zdet = det[det["zone"] == zid]
         zfz = fzm[fzm["zone"] == zid]
 
+        # dnevni broj detekcija, letova i minuta leta za žarište
         daily_det = zdet.groupby("date").size().reindex(day_range, fill_value=0)
         daily_flights = zfz.groupby("date")["flight_id"].nunique().reindex(day_range, fill_value=0)
         daily_minutes = zfz.groupby("date")["duration_minutes"].sum().reindex(day_range, fill_value=0)
 
+        # detekcije po danu i bloku, iz toga se dobiva oznaka
         block_pivot = zdet.groupby(["date", "block"]).size().unstack(fill_value=0)
         block_pivot = block_pivot.reindex(day_range, fill_value=0)
         for b in range(len(TIME_BLOCKS)):
@@ -236,6 +206,7 @@ def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
         no_det_day = (daily_det == 0).astype(int)
         daily_flights_no_det = daily_flights * no_det_day
 
+        # kumulativna obilježja i obilježja za zadnjih 7 i 30 dana, sve do prethodnog dana (shift(1))
         flights_cum = daily_flights.cumsum().shift(1).fillna(0)
         minutes_cum = daily_minutes.cumsum().shift(1).fillna(0)
         dets_cum = daily_det.cumsum().shift(1).fillna(0)
@@ -247,6 +218,7 @@ def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
         minutes_30d = daily_minutes.rolling(30, min_periods=1).sum().shift(1).fillna(0)
         prev_30d = dets_30d.shift(30).fillna(0)
 
+        # broj dana od zadnje detekcije
         had_det_yesterday = daily_det.shift(1).fillna(0) > 0
         last_det_day = pd.Series(np.where(had_det_yesterday, day_range, pd.NaT), index=day_range)
         last_det_day = last_det_day.ffill()
@@ -259,7 +231,7 @@ def build_zone_timeline_dataset(zones: list, detections_df: pd.DataFrame,
 
         for i, day in enumerate(day_range):
             if i < 30:
-                continue  # need real history before the rolling features mean anything
+                continue  # prvih 30 dana nema dovoljno povijesti za obilježja
             for b in range(len(TIME_BLOCKS)):
                 rows.append({
                     "zone": zid,
@@ -288,6 +260,7 @@ NUMERIC_FEATURES = ["flights_cum", "minutes_cum", "dets_cum", "flights_30d", "mi
                      "dets_7d", "dets_30d", "flights_no_det_cum", "days_since_last_det", "trend"]
 
 
+# Matrica obilježja: sat, dan i mjesec kao sinus i kosinus, povijesna obilježja i oznaka žarišta (one-hot)
 def _feature_matrix(dataset: pd.DataFrame):
     hour_rad = dataset["hour"].astype(float) / 24 * 2 * np.pi
     dow_rad = dataset["dow"].astype(float) / 7 * 2 * np.pi
@@ -305,6 +278,7 @@ def _feature_matrix(dataset: pd.DataFrame):
     return X, y
 
 
+# Modeli koji se uspoređuju (ključ, naziv, treba li standardizacija, model)
 MODEL_SPECS = [
     ("logistic_regression", "Logistic Regression", True, lambda: LogisticRegression(max_iter=1000)),
     ("knn", "k-Nearest Neighbors", True, lambda: KNeighborsClassifier(n_neighbors=15)),
@@ -315,16 +289,10 @@ MODEL_SPECS = [
 ]
 
 
+# Pokrivenost top-K žarišta: u svakom terminu žarišta se poredaju po procjeni modela
+# i gleda se koliki je udio stvarnih detekcija bio u K najrizičnijih žarišta.
+# Ne ovisi o pragu odluke.
 def topk_zone_coverage(dataset_slice: pd.DataFrame, y_proba, k_values=(5, 10)) -> dict:
-    """Operational readout, independent of any classification threshold:
-    across every (date, block) timeslot in `dataset_slice`, rank that
-    timeslot's zones by predicted probability and check whether each actual
-    positive ("a detection really happened here") falls inside the top-K.
-    This is the number that matters for dispatch — a border police unit can
-    only physically cover a handful of zones per shift, not all of them —
-    so it answers "if patrols/drones were sent to only the K highest-risk
-    zones every block, what share of real incidents would that have caught?"
-    """
     d = dataset_slice[["date", "block", "label"]].copy()
     d["proba"] = np.asarray(y_proba)
     total_positive = int(d["label"].sum())
@@ -341,16 +309,13 @@ def topk_zone_coverage(dataset_slice: pd.DataFrame, y_proba, k_values=(5, 10)) -
     return result
 
 
-# ── Phase 4: 4-model comparison, chronological train/validation/test split ─────
+# 4. korak: usporedba četiri modela
 def compare_zone_models(dataset: pd.DataFrame) -> dict:
     if dataset.empty or dataset["label"].sum() < 5:
         return {"trained": False, "message": "Nedovoljno pozitivnih primjera za pouzdanu procjenu modela."}
 
     dataset = dataset.sort_values("date").reset_index(drop=True)
-    # 60/20/20 chronological split: train fits the model, validation (a
-    # period strictly between train and test) tunes the decision threshold,
-    # test is only ever read once per model, after tuning — never touched
-    # by it — for an honest final score.
+    # Kronološka podjela 60/20/20: učenje, validacija (odabir praga) i test, koji se čita samo jednom
     train_cutoff = int(len(dataset) * 0.6)
     val_cutoff = int(len(dataset) * 0.8)
     X, y = _feature_matrix(dataset)
@@ -361,6 +326,7 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
     if y_train.nunique() < 2 or y_test.nunique() < 2:
         return {"trained": False, "message": "Kronološki test skup nema oba razreda — premalo podataka za pouzdanu procjenu."}
 
+    # težine primjera zbog neuravnoteženih razreda, standardizacija samo na skupu za učenje
     w_train = compute_sample_weight("balanced", y_train)
     scaler = StandardScaler().fit(X_train)
     X_train_scaled = pd.DataFrame(scaler.transform(X_train), columns=X_train.columns, index=X_train.index)
@@ -379,6 +345,7 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
         metrics["topk_coverage"] = topk_zone_coverage(test_slice, y_proba_test)
         results[key] = {"label": label, **metrics}
 
+    # najbolji model po F1, a kod jednakog F1 po ROC-AUC
     best_key = max(results, key=lambda k: (results[k]["f1"], results[k]["roc_auc"] or 0))
 
     return {
@@ -392,28 +359,27 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
     }
 
 
-# Training all 4 models is expensive (minutes at the current dataset scale);
-# a single academic page load hits both /zone-model-metrics and
-# /zone-predictions (the latter needs "best_model" whenever no explicit model
-# is requested), and the chat assistant calls them per user scope (station /
-# administration / whole network). One entry per dataset shape, so users with
-# different scopes don't keep evicting each other's result and retraining.
+# Učenje svih modela traje nekoliko minuta, pa se rezultat sprema u memoriju.
+# Čuva se do 8 rezultata, po jedan za svaki opseg podataka (postaja, uprava, cijela mreža).
 _MODEL_CACHE_MAX = 8
 _model_comparison_cache: dict = {}
 
 
 def compare_zone_models_cached(dataset: pd.DataFrame) -> dict:
+    # ključ se mijenja čim se promijene podaci
     key = (len(dataset), dataset["date"].max() if not dataset.empty else None, int(dataset["label"].sum()) if not dataset.empty else 0)
     if key in _model_comparison_cache:
         return _model_comparison_cache[key]
     result = compare_zone_models(dataset)
     if len(_model_comparison_cache) >= _MODEL_CACHE_MAX:
-        _model_comparison_cache.pop(next(iter(_model_comparison_cache)))  # drop the oldest entry
+        _model_comparison_cache.pop(next(iter(_model_comparison_cache)))  # briše se najstariji rezultat
     _model_comparison_cache[key] = result
     return result
 
 
-# ── Phase 5: predictive probabilities per zone ─────────────────────────────────
+# 5. korak: indeks rizika za svako žarište
+# Odabrani model uči se na svim podacima, a zatim procjenjuje rizik za zadani dan i blok
+# (ako nisu zadani, za trenutni). Žarišta bez dovoljno letova ne dobivaju procjenu.
 def predict_zone_probabilities(dataset: pd.DataFrame, zones: list, flight_stats: list,
                                 model_key: str = "gradient_boosting", dow: int | None = None,
                                 block: int | None = None) -> list:
@@ -443,6 +409,7 @@ def predict_zone_probabilities(dataset: pd.DataFrame, zones: list, flight_stats:
     target_hour = TIME_BLOCKS[target_block]["start"]
     target_month = int(now.month)
 
+    # za svako žarište uzimaju se njegova najnovija obilježja
     latest = dataset.sort_values("date").groupby("zone").tail(1).set_index("zone")
     stats_by_id = {s["id"]: s for s in flight_stats}
 
@@ -461,8 +428,9 @@ def predict_zone_probabilities(dataset: pd.DataFrame, zones: list, flight_stats:
             results.append({**base, "probability": None, "tier": "insufficient_data"})
             continue
 
+        # vrijeme se postavlja na traženi dan i blok
         row = latest.loc[zid].copy()
-        row["zone"] = zid  # set_index("zone") above dropped it from the columns
+        row["zone"] = zid  # set_index je maknuo stupac zone, pa se vraća
         row["hour"] = target_hour
         row["dow"] = target_dow
         row["month"] = target_month
@@ -473,6 +441,7 @@ def predict_zone_probabilities(dataset: pd.DataFrame, zones: list, flight_stats:
         if scaler is not None:
             Xq = pd.DataFrame(scaler.transform(Xq), columns=Xq.columns)
 
+        # indeks rizika 0-100 i boja na karti
         proba = round(float(model.predict_proba(Xq)[0, 1]) * 100, 1)
         tier = "red" if proba >= 70 else "orange" if proba >= 50 else "yellow" if proba >= 25 else "green"
 

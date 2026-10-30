@@ -35,10 +35,7 @@ class DroneCheckout extends Model
         return (int) $this->checked_out_at->diffInMinutes($this->checked_in_at);
     }
 
-    /**
-     * Za buduću USB integraciju: pronađi korisnika koji je zadužio dron
-     * u trenutku kada je let obavljen, radi automatskog upisa leta.
-     */
+    // Za budući automatski uvoz letova: tko je zadužio dron u vrijeme leta
     public static function findPilotForFlight(int $droneId, Carbon $flightDate): ?int
     {
         $checkout = static::where('drone_id', $droneId)

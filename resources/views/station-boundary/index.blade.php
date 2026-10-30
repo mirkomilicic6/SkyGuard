@@ -110,8 +110,7 @@ overviewStations.forEach(st => {
     overviewLayers.push(layer);
 });
 
-// Administration (uprava) boundaries — drawn distinctly (thick magenta dashed
-// line) so they're never confused with station territories.
+// granice uprava, debela ljubičasta isprekidana linija da se ne miješaju s područjima postaja
 adminBoundaries.forEach(a => {
     const layer = L.polygon(a.boundary, { color: '#c026d3', weight: 4, dashArray: '10,6', fillOpacity: 0.02 })
         .bindTooltip(a.name, { direction: 'center' })

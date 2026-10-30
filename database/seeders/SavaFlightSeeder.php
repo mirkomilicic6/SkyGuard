@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
 
 class SavaFlightSeeder extends Seeder
 {
-    // Patrol areas along the Sava river (Croatian north bank), Slavonski Brod → Gunja
+    // područja nadzora uz Savu (hrvatska obala), od Slavonskog Broda do Gunje
     private array $areas = [
         ['lat' => 45.1650, 'lon' => 17.9750, 'name' => 'Slavonski Brod — zapad'],
         ['lat' => 45.1580, 'lon' => 18.0480, 'name' => 'Slavonski Brod — istok'],
@@ -26,7 +26,7 @@ class SavaFlightSeeder extends Seeder
         ['lat' => 44.9120, 'lon' => 18.8200, 'name' => 'Drenovci — Gunja'],
     ];
 
-    // Detection hotspots at known river-crossing points along the Sava
+    // žarišta na poznatim prijelazima preko Save
     private array $hotspots = [
         // Slavonski Brod area
         ['lat' => 45.1620, 'lon' => 17.9680, 'types' => ['person', 'group']],
@@ -167,17 +167,17 @@ class SavaFlightSeeder extends Seeder
         $this->command->info('Total detection count: ' . Detection::count());
     }
 
-    // River patrols follow the Sava (roughly WSW→ESE, bearing ~100°), back-and-forth
+    // let prati Savu, tamo-amo (smjer oko 100 stupnjeva)
     private function generateRiverPatrol(array $center, Carbon $startTime): array
     {
         $pointCount = rand(45, 75);
         $interval   = rand(8, 13);
 
-        // Sava bearing: ~100° (ESE) or reverse ~280°
+        // smjer Save oko 100 ili obrnuto oko 280 stupnjeva
         $bearing = rand(0, 1) ? rand(95, 115) : rand(275, 295);
         $rad     = deg2rad($bearing);
         $dist    = 0.025 + lcg_value() * 0.035;
-        $offset  = 0.0006; // slight offset for the return pass (north bank parallel)
+        $offset  = 0.0006; // povratak malo pomaknut, paralelno s obalom
 
         $endLat = $center['lat'] + $dist * cos($rad);
         $endLon = $center['lon'] + $dist * sin($rad);

@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Log;
 
 class WeatherService
 {
-    /**
-     * Current weather + flight-suitability rating for a station, or null if the
-     * station has no coordinates or the weather API is unreachable.
-     */
+    // Trenutno vrijeme i ocjena pogodnosti za let na lokaciji postaje.
+    // Vraća null ako postaja nema koordinate ili servis za prognozu ne odgovara.
     public function forStation(?BorderPoliceStation $station): ?array
     {
         if (!$station || $station->latitude === null || $station->longitude === null) {

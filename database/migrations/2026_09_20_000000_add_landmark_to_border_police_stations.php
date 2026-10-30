@@ -8,10 +8,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('border_police_stations', function (Blueprint $table) {
-            // Optional, manually-entered note about a nearby natural landmark
-            // (e.g. "uz rijeku Dunav") — appended to the AI chat assistant's
-            // location descriptions when present. Never inferred/guessed by
-            // the app; left null until someone with local knowledge fills it in.
+            // neobavezna napomena o prirodnoj oznaci u blizini (npr. "uz rijeku Dunav"),
+            // asistent je dodaje opisu lokacije, a upisuje je korisnik
             $table->string('landmark')->nullable()->after('boundary');
         });
     }

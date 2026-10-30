@@ -34,7 +34,7 @@ class DetectionController extends Controller
             $administrations = null;
         }
 
-        // Admin manages a whole administration — offer a station filter scoped to it.
+        // administrator uprave može filtrirati po postajama svoje uprave
         $stations = (!$isSuperAdmin && $user->hasRole('admin') && $user->station?->police_administration_id)
             ? BorderPoliceStation::where('police_administration_id', $user->station->police_administration_id)
                 ->orderBy('name')->get()
@@ -81,7 +81,7 @@ class DetectionController extends Controller
             ->limit(150)
             ->get();
 
-        // Stations the user is allowed to pick when the detection isn't tied to a flight.
+        // postaje koje korisnik smije odabrati kad detekcija nije vezana uz let
         $stations = $user->station_id === null
             ? BorderPoliceStation::orderBy('name')->get()
             : ($user->hasRole('admin') && $user->station?->police_administration_id
@@ -111,7 +111,7 @@ class DetectionController extends Controller
 
         $stationId = $validated['station_id'] ?? null;
 
-        // Verify station ownership for non-super-admins.
+        // provjera smije li korisnik unositi za tu postaju
         if ($user->station_id) {
             if (!empty($validated['flight_id'])) {
                 $flight = Flight::findOrFail($validated['flight_id']);
@@ -124,7 +124,7 @@ class DetectionController extends Controller
             }
         }
 
-        // A flight-linked detection inherits the flight's station automatically.
+        // detekcija s leta dobiva postaju leta
         if (!empty($validated['flight_id'])) {
             $stationId = Flight::find($validated['flight_id'])->station_id ?? $stationId;
         }

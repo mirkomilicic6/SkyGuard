@@ -7,10 +7,7 @@ use Illuminate\Http\Request;
 
 class RecommendationController extends Controller
 {
-    /**
-     * JSON variant of the DBSCAN-hotspot recommendations (model-probability
-     * driven), for the academic pipeline page's fifth card.
-     */
+    // Preporuke za DBSCAN žarišta u JSON obliku, za petu karticu stranice ML analiza
     public function dbscanZones(Request $request, RecommendationService $service)
     {
         $user         = auth()->user();

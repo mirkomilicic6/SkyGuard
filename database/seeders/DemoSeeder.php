@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Hash;
 
 class DemoSeeder extends Seeder
 {
-    // Center coordinates for each station (lat, lng) — Croatian side of the BiH border
+    // središte svake postaje (lat, lng), s hrvatske strane granice s BiH
     private array $stationCoords = [
         'PGP Slunj'              => [45.130, 15.585],
         'PGP Cetingrad'          => [45.125, 15.760],
@@ -50,7 +50,7 @@ class DemoSeeder extends Seeder
         'PGP Orebić'             => [42.978, 17.172],
     ];
 
-    // Terrain altitude (m) per station for realistic GPX
+    // nadmorska visina terena (m) po postaji
     private array $stationAltitude = [
         'PU Karlovačka'             => [200, 380],
         'PU Sisačko-moslavačka'     => [90,  200],
@@ -108,7 +108,7 @@ class DemoSeeder extends Seeder
         $this->command->info("Gotovo! Kreirano: 30 korisnika, {$drones->count()} dronova, {$flightCount} letova.");
     }
 
-    // -------------------------------------------------------------------------
+    // brisanje postojećih podataka
 
     private function clearDatabase(): void
     {
@@ -127,14 +127,14 @@ class DemoSeeder extends Seeder
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
     }
 
-    // -------------------------------------------------------------------------
+    // korisnici
 
     private function createUsers(): \Illuminate\Support\Collection
     {
         $stations = BorderPoliceStation::with('administration')->get()->keyBy('name');
         $allUsers = collect();
 
-        // Predefined 30 users — station, role, name
+        // 30 unaprijed zadanih korisnika: postaja, uloga, ime
         $userDefs = [
             // PU Karlovačka (6 korisnika)
             ['station' => 'PGP Slunj',               'role' => 'admin',  'fn' => 'Ivan',      'ln' => 'Horvat'],
@@ -194,7 +194,7 @@ class DemoSeeder extends Seeder
         return $allUsers;
     }
 
-    // -------------------------------------------------------------------------
+    // dronovi
 
     private function createDrones(\Illuminate\Support\Collection $users): \Illuminate\Support\Collection
     {
@@ -207,7 +207,7 @@ class DemoSeeder extends Seeder
 
         foreach ($stations as $station) {
             $coords  = $this->stationCoords[$station->name] ?? [44.5, 16.5];
-            $count   = 2; // 2 drones per station
+            $count   = 2; // dva drona po postaji
 
             for ($i = 0; $i < $count; $i++) {
                 $model = $this->droneModels[array_rand($this->droneModels)];
@@ -223,7 +223,7 @@ class DemoSeeder extends Seeder
                     'notes'         => 'Operativna letjelica, sektor ' . $station->name,
                 ]);
 
-                // Assign all pilots from this station to all drones of this station
+                // svi piloti postaje dobivaju sve dronove postaje
                 $stationPilots = $pilotsByStation->get($station->id, collect());
                 if ($stationPilots->isNotEmpty()) {
                     $drone->pilots()->sync($stationPilots->pluck('id'));
@@ -236,25 +236,25 @@ class DemoSeeder extends Seeder
         return $allDrones;
     }
 
-    // -------------------------------------------------------------------------
+    // letovi
 
     private function createFlights(\Illuminate\Support\Collection $users, \Illuminate\Support\Collection $drones): void
     {
         $pilots = $users->filter(fn($u) => $u->hasRole('pilot'));
         $dronesByStation = $drones->groupBy('station_id');
 
-        // Distribute flights: some pilots get 8-12 flights, some 4-7, totalling 200+
+        // raspodjela letova: neki piloti 8-12, neki 4-7, ukupno više od 200
         $totalFlights = 0;
         $gpxBatch     = [];
         $flightId     = 0;
 
-        // Assign varying flight counts to make it look realistic
+        // različit broj letova po pilotu
         $flightCounts = [];
         foreach ($pilots as $pilot) {
             $flightCounts[$pilot->id] = rand(8, 14);
         }
 
-        // Ensure at least 200 total
+        // najmanje 200 letova ukupno
         $sum = array_sum($flightCounts);
         if ($sum < 200) {
             $toAdd = 200 - $sum;
@@ -282,7 +282,7 @@ class DemoSeeder extends Seeder
 
                 $duration    = rand(18, 55);
                 $pointCount  = rand(50, 80);
-                $heading     = rand(0, 360); // patrol direction
+                $heading     = rand(0, 360); // smjer leta
 
                 [$points, $stats] = $this->generateGpxPath(
                     $coords[0], $coords[1],
@@ -321,7 +321,7 @@ class DemoSeeder extends Seeder
                     ];
                 }
 
-                // Bulk insert every 100 flights worth of points to avoid memory issues
+                // točke se upisuju svakih 100 letova, zbog memorije
                 if (count($gpxBatch) >= 5000) {
                     GpxPoint::insert($gpxBatch);
                     $gpxBatch = [];
@@ -334,7 +334,7 @@ class DemoSeeder extends Seeder
         }
     }
 
-    // -------------------------------------------------------------------------
+    // održavanje
 
     private function createMaintenance(\Illuminate\Support\Collection $drones, \Illuminate\Support\Collection $users): void
     {
@@ -378,9 +378,7 @@ class DemoSeeder extends Seeder
         }
     }
 
-    // -------------------------------------------------------------------------
-    // GPX path generation — realistic patrol path along border
-    // -------------------------------------------------------------------------
+    // GPX putanja leta uz granicu
 
     private function generateGpxPath(
         float $lat, float $lng,
@@ -389,19 +387,19 @@ class DemoSeeder extends Seeder
         array $altRange,
         int   $heading
     ): array {
-        // 1 degree lat ≈ 111 km, 1 degree lng ≈ 111 * cos(lat) km
+        // 1 stupanj širine je oko 111 km, 1 stupanj dužine oko 111 * cos(lat) km
         $latPerM = 1 / 111000;
         $lngPerM = 1 / (111000 * cos(deg2rad($lat)));
 
-        // Speed: 30-60 km/h = 8-17 m/s
+        // brzina 30-60 km/h, odnosno 8-17 m/s
         $speedMs     = rand(80, 160) / 10.0; // m/s
         $intervalSec = $durationMin * 60 / $pointCount;
         $stepM       = $speedMs * $intervalSec;
 
         $baseAlt = rand($altRange[0], $altRange[1]);
-        $aglBase = rand(60, 130); // altitude above ground (AGL)
+        $aglBase = rand(60, 130); // visina iznad tla
 
-        // Flight goes out ~60% of duration, returns ~40%
+        // odlazak traje oko 60 % leta, povratak oko 40 %
         $outPoints = intval($pointCount * 0.55);
 
         $headRad = deg2rad($heading);
@@ -414,10 +412,10 @@ class DemoSeeder extends Seeder
         $maxAlt    = 0.0;
 
         for ($i = 0; $i < $pointCount; $i++) {
-            // Altitude with gradual change + small noise
+            // visina se mijenja postupno, uz mala odstupanja
             $altProgress = $i < 5
-                ? ($i / 5)                         // takeoff
-                : ($i > $pointCount - 5 ? (($pointCount - $i) / 5) : 1.0); // landing
+                ? ($i / 5)                         // polijetanje
+                : ($i > $pointCount - 5 ? (($pointCount - $i) / 5) : 1.0); // slijetanje
             $alt = ($baseAlt + $aglBase) * $altProgress + rand(-8, 8);
             $alt = max(0, $alt);
 
@@ -427,16 +425,16 @@ class DemoSeeder extends Seeder
                 'lat'   => round($curLat, 7),
                 'lng'   => round($curLng, 7),
                 'alt'   => round($alt, 1),
-                'speed' => round($speed * 3.6, 1), // convert to km/h
+                'speed' => round($speed * 3.6, 1), // u km/h
             ];
 
             $maxAlt = max($maxAlt, $alt);
 
-            // Movement: follow heading for outward leg, reverse for return
+            // u odlasku let prati smjer, a u povratku obrnuto
             $dir = $i < $outPoints ? 1 : -1;
 
-            $drift   = sin($i * 0.4) * $stepM * 0.15; // gentle lateral drift
-            $jitter  = rand(-5, 5);                    // small random jitter (metres)
+            $drift   = sin($i * 0.4) * $stepM * 0.15; // blago bočno skretanje
+            $jitter  = rand(-5, 5);                    // malo nasumično odstupanje (u metrima)
 
             $curLat += $dir * cos($headRad) * ($stepM + $jitter) * $latPerM
                      + $drift * sin($perpRad) * $latPerM;
@@ -459,7 +457,7 @@ class DemoSeeder extends Seeder
         return [$points, $stats];
     }
 
-    // -------------------------------------------------------------------------
+    // pomoćne funkcije
 
     private function randomStatus(): string
     {

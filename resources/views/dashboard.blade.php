@@ -20,9 +20,7 @@
     </div>
 @endif
 
-{{-- ================================================================
-     PILOT: Checkout widget
-     ================================================================ --}}
+{{-- Pilot: zaduženje drona --}}
 @if(auth()->user()->hasRole('pilot'))
 @if($activeCheckout)
 <div class="db-checkout-active mb-4">
@@ -72,9 +70,7 @@
 @endif
 @endif
 
-{{-- ================================================================
-     ADMIN: Action queue — faults awaiting review
-     ================================================================ --}}
+{{-- Administrator: kvarovi koji čekaju obradu --}}
 @if(auth()->user()->hasRole('admin') && $pendingReview->isNotEmpty())
 <div class="db-card mb-4">
     <div class="db-card-header">
@@ -108,9 +104,7 @@
 </div>
 @endif
 
-{{-- ================================================================
-     KPI CARDS
-     ================================================================ --}}
+{{-- Osnovni pokazatelji --}}
 <div class="db-kpi-grid mb-4">
 
     <a href="{{ route('drones.index') }}" class="db-kpi-card db-kpi-blue">
@@ -160,9 +154,7 @@
 
 </div>
 
-{{-- ================================================================
-     CHART + SIDEBAR
-     ================================================================ --}}
+{{-- Graf i bočni stupac --}}
 <div class="row mb-4">
     <div class="col-xl-8 col-lg-7">
         <div class="db-card">
@@ -228,9 +220,7 @@
     </div>
 </div>
 
-{{-- ================================================================
-     DATE FILTER (admin/viewer)
-     ================================================================ --}}
+{{-- Filter po datumu (administrator i analitičar) --}}
 @if($isAdmin)
 <div class="db-filter-bar mb-4">
     <form method="GET" action="{{ route('dashboard') }}" class="db-filter-form">
@@ -253,10 +243,7 @@
 </div>
 @endif
 
-{{-- ================================================================
-     HEATMAP (admin/viewer/pilot) — super admin gets the fuller
-     "Pregled cijele mreže" card below instead.
-     ================================================================ --}}
+{{-- Toplinska karta (glavni administrator umjesto nje ima Pregled cijele mreže) --}}
 @if(!$isSuperAdmin)
 <div class="db-card mb-4">
     <div class="db-card-header">
@@ -282,11 +269,7 @@
     </div>
 </div>
 @else
-{{-- ================================================================
-     SUPER ADMIN: network-wide overview map
-     Filters (uprava/postaja, datum, vrsta, izvor) + toggleable layers:
-     heatmapa, detekcije, letovi, kamere, postaje, granice uprava.
-     ================================================================ --}}
+{{-- Glavni administrator: pregled cijele mreže s filterima i slojevima koji se mogu uključiti --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -297,7 +280,7 @@
         </div>
     </div>
 
-    {{-- Filters ------------------------------------------------------------ --}}
+    {{-- Filteri --}}
     <div class="ovm-filters">
         <select id="ovmAdministration" class="form-control form-control-sm">
             <option value="">— Sva uprava —</option>
@@ -338,7 +321,7 @@
         <button id="ovmReset" class="btn btn-sm btn-secondary"><i class="fas fa-times"></i></button>
     </div>
 
-    {{-- Layer toggles -------------------------------------------------------- --}}
+    {{-- Uključivanje slojeva --}}
     <div class="ovm-layers">
         <label><input type="checkbox" id="ovmLayerHeat" checked> Heatmapa letova</label>
         <label><input type="checkbox" id="ovmLayerPoints"> Detekcije</label>
@@ -352,7 +335,7 @@
         <div id="overviewMap" style="height:480px; border-radius:0 0 12px 12px;"></div>
     </div>
 
-    {{-- Legend ---------------------------------------------------------------- --}}
+    {{-- Legenda --}}
     <div class="ovm-legend">
         <span><i class="ovm-legend-dot" style="background:#fd7e14"></i>Osoba</span>
         <span><i class="ovm-legend-dot" style="background:#dc3545"></i>Grupa</span>
@@ -364,9 +347,7 @@
 </div>
 @endif
 
-{{-- ================================================================
-     RECENT FLIGHTS
-     ================================================================ --}}
+{{-- Zadnji letovi --}}
 <div class="db-card">
     <div class="db-card-header">
         <div>
@@ -447,10 +428,10 @@
 @section('css')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-/* ── content padding (content-header is hidden) ──────────────── */
+/* razmak sadržaja (zaglavlje je skriveno) */
 .content-wrapper > .content { padding-top: 1.5rem; }
 
-/* ── KPI GRID ───────────────────────────────────────────────── */
+/* Osnovni pokazatelji */
 .db-kpi-grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -460,7 +441,7 @@
 @media(max-width:768px) { .db-kpi-grid { grid-template-columns: repeat(2,1fr); } }
 @media(max-width:480px) { .db-kpi-grid { grid-template-columns: 1fr; } }
 
-/* ── YEAR SELECT ─────────────────────────────────────────────── */
+/* Odabir godine */
 .db-year-select {
     background: rgba(255,255,255,0.07);
     border: 1px solid rgba(255,255,255,0.12);
@@ -471,7 +452,7 @@
 }
 .db-year-select option { background: #112247; }
 
-/* ── FILTER BAR ──────────────────────────────────────────────── */
+/* Traka s filterima */
 .db-filter-bar {
     background: var(--navy-card);
     border: 1px solid rgba(255,255,255,0.06);
@@ -521,7 +502,7 @@
     font-size: 0.75rem;
 }
 
-/* ── EMPTY MAP ───────────────────────────────────────────────── */
+/* Prazna karta */
 .db-empty-map {
     height: 200px;
     display: flex;
@@ -534,7 +515,7 @@
 }
 .db-empty-map div { font-size: 0.9rem; }
 
-/* ── FLIGHTS TABLE ───────────────────────────────────────────── */
+/* Tablica letova */
 .db-flights-table-wrap { overflow-x: auto; }
 .db-table {
     width: 100%;
@@ -592,7 +573,7 @@
 }
 .db-view-btn:hover { background: rgba(23,162,184,0.3); color: #fff; text-decoration: none; }
 
-/* ── SUPER ADMIN OVERVIEW MAP ────────────────────────────────── */
+/* Pregled cijele mreže */
 .ovm-filters {
     display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
     padding: .6rem 1.2rem;
@@ -617,7 +598,7 @@
 .ovm-legend span { display: flex; align-items: center; gap: .35rem; }
 .ovm-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 
-/* ── CHECKOUT WIDGET ─────────────────────────────────────────── */
+/* Zaduženje drona */
 .db-checkout-active {
     display: flex;
     align-items: center;
@@ -681,7 +662,7 @@
 }
 .db-checkout-btn:hover { background: rgba(240,192,64,0.28); }
 
-/* ── Admin action queue ──────────────────────────────────────── */
+/* Kvarovi koji čekaju obradu */
 .db-action-row {
     display: flex; align-items: center; gap: 1rem;
     padding: 0.85rem 1.4rem;
@@ -693,7 +674,7 @@
 .db-action-desc { color: rgba(255,255,255,0.6); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .db-action-meta { color: rgba(255,255,255,0.35); font-size: 0.72rem; }
 
-/* ── content header hidden ───────────────────────────────────── */
+/* skriveno zaglavlje */
 .content-header { display: none; }
 </style>
 @endsection
@@ -726,7 +707,7 @@ L.heatLayer(heatData, {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
-// ── Super admin: network-wide overview map ─────────────────────────────────
+// Pregled cijele mreže (glavni administrator)
 const overviewMap = L.map('overviewMap').setView([45.1, 18.0], 8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
@@ -745,8 +726,7 @@ const ovmTypeColors = { person: '#fd7e14', group: '#dc3545', vehicle: '#0d6efd',
 function ovmRenderHeat() {
     if (ovmHeatLayer) { overviewMap.removeLayer(ovmHeatLayer); ovmHeatLayer = null; }
     if (!document.getElementById('ovmLayerHeat').checked) return;
-    // Heat layer here represents flight-route density (GPX points), same
-    // dataset/semantics as the admin/viewer "Heatmapa" card, not detections.
+    // toplinska karta ovdje prikazuje gustoću letova (GPS točke), a ne detekcije
     const pts = ovmData.routes.flat();
     if (!pts.length) return;
     ovmHeatLayer = L.heatLayer(pts, {
@@ -868,7 +848,7 @@ document.getElementById('ovmReset').addEventListener('click', () => {
     document.getElementById(id).addEventListener('change', ovmSyncVisibility);
 });
 
-// Administration → station cascading filter
+// odabir uprave pa postaje
 const ovmAdminSelect = document.getElementById('ovmAdministration');
 const ovmStationSelect = document.getElementById('ovmStation');
 ovmAdminSelect.addEventListener('change', () => {

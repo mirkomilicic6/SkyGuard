@@ -144,7 +144,7 @@ class FlightController extends Controller
             return $this->applyStationScope(Flight::query());
         }
 
-        // Pilot sees own flights only
+        // pilot vidi samo svoje letove
         return Flight::where('user_id', $user->id);
     }
 
@@ -157,7 +157,7 @@ class FlightController extends Controller
             return $this->applyStationScope($q)->get();
         }
 
-        // Pilot — only checked-out drone
+        // pilot može odabrati samo dron koji je zadužio
         $checkout = DroneCheckout::where('user_id', $user->id)
             ->whereNull('checked_in_at')
             ->first();

@@ -28,7 +28,7 @@ class ReportController extends Controller
             ? PoliceAdministration::with('stations')->orderBy('name')->get()
             : null;
 
-        // Admin manages a whole administration — offer a station filter scoped to it.
+        // administrator uprave može filtrirati po postajama svoje uprave
         $stations = (!$isSuperAdmin && $user->hasRole('admin') && $user->station?->police_administration_id)
             ? BorderPoliceStation::where('police_administration_id', $user->station->police_administration_id)
                 ->orderBy('name')->get()
@@ -96,8 +96,7 @@ class ReportController extends Controller
         $user = auth()->user();
 
         if ($user->hasRole('pilot')) {
-            // Pilots only ever see their own flights, regardless of any
-            // station_id/administration_id query params.
+            // pilot uvijek vidi samo svoje letove
             $query->where('user_id', $user->id);
             $flights = $query->get();
 
@@ -113,15 +112,14 @@ class ReportController extends Controller
         $scopedIds = $this->scopedStationIds();
 
         if ($scopedIds !== null) {
-            // Non-super-admin: admins get every station in their administration,
-            // viewers just their own — optionally narrowed to one station of their scope.
+            // administrator vidi sve postaje uprave, analitičar samo svoju, uz mogući odabir jedne postaje
             if ($stationId && in_array((int) $stationId, $scopedIds, true)) {
                 $query->where('station_id', $stationId);
             } else {
                 $query->whereIn('station_id', $scopedIds);
             }
         } else {
-            // Super admin: optional filters
+            // glavni administrator, filteri nisu obavezni
             if ($stationId) {
                 $query->where('station_id', $stationId);
             } elseif ($adminId) {
@@ -155,7 +153,7 @@ class ReportController extends Controller
         $monthName   = Carbon::create($year, $month, 1)->locale('hr')->isoFormat('MMMM YYYY');
         $daysInMonth = Carbon::create($year, $month, 1)->daysInMonth;
 
-        // ── Naslov ───────────────────────────────────────────────────────────
+        // naslov
         $section->addText(
             'IZVJEŠTAJ O LETOVIMA',
             ['bold' => true, 'size' => 18, 'color' => '1F3864'],
@@ -205,7 +203,7 @@ class ReportController extends Controller
             ['spaceAfter' => 160]
         );
 
-        // ── Tablica ──────────────────────────────────────────────────────────
+        // tablica
         $tableStyle = [
             'borderSize' => 6, 'borderColor' => 'AAAAAA',
             'cellMargin' => 80, 'unit' => TblWidth::PERCENT, 'width' => 100 * 50,
@@ -264,7 +262,7 @@ class ReportController extends Controller
             );
         }
 
-        // Ukupno red
+        // redak s ukupnim zbrojem
         $table->addRow(400);
         $table->addCell(null, $tCell)->addText('UKUPNO', $tFont);
         foreach (range(2, $colCount - 2) as $_) {

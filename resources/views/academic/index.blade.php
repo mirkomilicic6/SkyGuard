@@ -8,7 +8,7 @@
 
 @section('content')
 
-{{-- ══ 1. Izvorni podaci ══════════════════════════════════════════════════ --}}
+{{-- 1. Izvorni podaci --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -64,7 +64,7 @@
     </div>
 </div>
 
-{{-- ══ 2. DBSCAN žarišta ══════════════════════════════════════════════════ --}}
+{{-- 2. DBSCAN žarišta --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -75,7 +75,7 @@
     <div id="zonesMap" style="height:460px;border-radius:0 0 12px 12px"></div>
 </div>
 
-{{-- ══ 3. Usporedba modela ════════════════════════════════════════════════ --}}
+{{-- 3. Usporedba modela --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -111,7 +111,7 @@
     </div>
 </div>
 
-{{-- ══ 4. Prediktivna karta ═══════════════════════════════════════════════ --}}
+{{-- 4. Prediktivna karta --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -129,7 +129,7 @@
     <div id="predMap" style="height:460px;border-radius:0 0 12px 12px"></div>
 </div>
 
-{{-- ══ 5. Preporuke nadzora ═══════════════════════════════════════════════ --}}
+{{-- 5. Preporuke nadzora --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -152,14 +152,14 @@
     </div>
 </div>
 
-{{-- ══ Dodatni alati — izvan glavnog pristupa (koraci 1–5) ═══════════════════ --}}
+{{-- Dodatni alati izvan glavnog pristupa --}}
 <div class="alert" style="background:rgba(13,110,253,0.12);border:1px solid rgba(13,110,253,0.35);color:#9fc3ff;border-radius:10px;padding:.85rem 1.4rem;margin:2rem 0 1.2rem;font-size:.85rem">
     <i class="fas fa-flask mr-2"></i>
     Alati ispod nisu dio gornjeg glavnog pristupa (koraci 1–5) — to su konceptualno odvojeni, alternativni pristupi: brza
     heuristika po lokaciji i RandomForest treniran po prostornoj mreži umjesto po DBSCAN zonama.
 </div>
 
-{{-- ── Usporedba pristupa ──────────────────────────────────────────────────── --}}
+{{-- Usporedba pristupa --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div class="db-card-title"><i class="fas fa-balance-scale mr-2" style="color:var(--gold)"></i>Usporedba pristupa</div>
@@ -225,7 +225,7 @@
     </div>
 </div>
 
-{{-- ── Predict tool (heuristika, ne ML model) ──────────────────────────────── --}}
+{{-- Brza procjena za točku (bez učenja) --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div class="db-card-title"><i class="fas fa-crosshairs mr-2" style="color:var(--gold)"></i>Brza procjena rizika lokacije</div>
@@ -277,7 +277,7 @@
     </div>
 </div>
 
-{{-- ── Predictive risk grid (RandomForest, mrežni pristup) ─────────────────── --}}
+{{-- Mreža rizika (slučajna šuma) --}}
 <div class="db-card mb-4">
     <div class="db-card-header">
         <div>
@@ -346,13 +346,10 @@ function baseMap(id) {
     return map;
 }
 
-// The 5 cards below are loaded ONE AT A TIME (not in parallel): the ml-service
-// dev process is single-worker, and firing all 5 requests at once (two of
-// which — model comparison and prediction — retrain several models) starves
-// the cheap requests and produces intermittent timeouts. Sequencing keeps
-// every load reliable at the cost of a slightly longer total page load.
+// kartice se učitavaju jedna za drugom, a ne istodobno, jer servis za strojno učenje
+// obrađuje jedan zahtjev u isto vrijeme, a usporedba modela traje dugo
 
-// ── 1. Dataset preview ────────────────────────────────────────────────────────
+// 1. Izvorni podaci
 async function loadDataset() {
     try {
         const d = await fetch('{{ route('ai.zoneDatasetPreview') }}?rows=12').then(r => r.json());
@@ -375,7 +372,7 @@ async function loadDataset() {
     }
 }
 
-// ── 2. DBSCAN zones map ──────────────────────────────────────────────────────
+// 2. Karta DBSCAN žarišta
 async function loadZonesMap() {
     const zonesMap = baseMap('zonesMap');
     try {
@@ -396,7 +393,7 @@ async function loadZonesMap() {
     }
 }
 
-// ── 3. Model comparison ──────────────────────────────────────────────────────
+// 3. Usporedba modela
 async function loadModelComparison() {
     try {
         const d = await fetch('{{ route('ai.zoneModelMetrics') }}').then(r => r.json());
@@ -454,7 +451,7 @@ async function loadModelComparison() {
     }
 }
 
-// ── 4. Predictive map ────────────────────────────────────────────────────────
+// 4. Prediktivna karta
 async function loadPredictiveMap() {
     const predMap = baseMap('predMap');
     const tierColor = { red: '#dc3545', orange: '#fd7e14', yellow: '#f0c040', green: '#28a745', insufficient_data: '#6c757d' };
@@ -481,7 +478,7 @@ async function loadPredictiveMap() {
     }
 }
 
-// ── 5. Recommendations ───────────────────────────────────────────────────────
+// 5. Preporuke nadzora
 async function loadRecommendations() {
     const recMap = baseMap('recMap');
     const recColor = { increase: '#dc3545', maintain: '#f0c040', consider_reduction: '#28a745', insufficient_data: '#6c757d' };
@@ -513,9 +510,9 @@ async function loadRecommendations() {
     }
 }
 
-// ══ Additional tools — outside the numbered academic pipeline ═══════════════
+// Dodatni alati izvan glavnog pristupa
 
-// ── Predict tool (heuristic, not a trained model) ────────────────────────────
+// Brza procjena za točku (bez učenja)
 const predictMap = L.map('predictMap').setView([45.15, 18.1], 9);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
@@ -576,7 +573,7 @@ document.getElementById('predictBtn').addEventListener('click', async () => {
     }
 });
 
-// ── Predictive risk grid (RandomForest, mrežni pristup) ──────────────────────
+// Mreža rizika (slučajna šuma)
 const riskGridMap = L.map('riskGridMap').setView([45.15, 18.1], 9);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19

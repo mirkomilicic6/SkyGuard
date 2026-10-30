@@ -9,22 +9,22 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('detections', function (Blueprint $table) {
-            // Allow detections without a flight (camera/manual source)
+            // detekcija ne mora biti vezana uz let (kamera, ručni unos)
             $table->unsignedBigInteger('flight_id')->nullable()->change();
 
-            // Hunting camera source
+            // lovačka kamera
             $table->foreignId('camera_id')
                 ->nullable()
                 ->constrained('hunting_cameras')
                 ->nullOnDelete()
                 ->after('flight_id');
 
-            // How was it detected
+            // izvor detekcije
             $table->enum('source', ['drone', 'camera', 'manual'])
                 ->default('drone')
                 ->after('camera_id');
 
-            // AI analysis fields
+            // polja za AI analizu
             $table->boolean('confirmed')->nullable()->after('notes');
             $table->string('action_taken', 30)->nullable()->after('confirmed');
             $table->unsignedSmallInteger('heading_deg')->nullable()->after('action_taken');

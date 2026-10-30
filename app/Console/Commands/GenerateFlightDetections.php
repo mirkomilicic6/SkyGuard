@@ -14,7 +14,7 @@ class GenerateFlightDetections extends Command
 
     protected $description = 'Add random detections to a subset of the generated border patrol flights';
 
-    /** type => [min count, max count, relative weight] */
+    // vrsta => [najmanji broj, najveći broj, relativna težina]
     private const TYPES = [
         'person'  => ['min' => 1, 'max' => 1, 'weight' => 40],
         'group'   => ['min' => 2, 'max' => 10, 'weight' => 28],

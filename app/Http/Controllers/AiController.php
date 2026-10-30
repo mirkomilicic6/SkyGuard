@@ -19,7 +19,7 @@ class AiController extends Controller
     {
         $this->base = config('services.ml.url');
     }
-    /** `?station_id=`/`?administration_id=` query fragment scoped to the current user. */
+    // Parametar postaje ili uprave za upit prema servisu, prema opsegu korisnika
     private function scopeParam(string $prefix = '?'): string
     {
         $user      = auth()->user();
@@ -41,13 +41,8 @@ class AiController extends Controller
         }
     }
 
-    /**
-     * "Pregled" — the foundational-data landing page: what we actually have
-     * (detections, flights, history length), not model output. Deliberately
-     * queries the app's own database rather than ml-service, so it stays
-     * useful even when the ML microservice is down; detailed breakdowns live
-     * on Analitika, DBSCAN/model/prediction output lives on ML analiza.
-     */
+    // Stranica Pregled: osnovni podaci (detekcije, letovi, razdoblje), a ne rezultati modela.
+    // Čita iz baze aplikacije, pa radi i kad servis za strojno učenje ne radi.
     public function index()
     {
         $scopedIds = $this->scopedStationIds();
@@ -75,8 +70,7 @@ class AiController extends Controller
             $mlOnline  = false;
         }
 
-        // Same check ChatController::respond() relies on — a missing API key
-        // is the only thing we can know without actually spending a request.
+        // asistent radi samo ako je postavljen API ključ
         try {
             new \Anthropic\Client();
             $assistantOnline = true;
@@ -116,11 +110,7 @@ class AiController extends Controller
 
     public function clusters()
     {
-        // DBSCAN over every detection is cheap once cached in-process by
-        // ml-service, but a cold run (service just (re)started) scans the
-        // full table — tens of seconds at the current dataset size, so this
-        // needs real headroom rather than the old 8s tuned for a far smaller
-        // dataset.
+        // prvi izračun žarišta nakon pokretanja servisa može trajati desetke sekundi
         return $this->proxy('/clusters', 120);
     }
 
@@ -129,15 +119,8 @@ class AiController extends Controller
         return view('ai.footage');
     }
 
-    /**
-     * Forwards an uploaded video to ml-service's YOLOv8 detection endpoint
-     * and returns its per-sampled-frame box data as-is. `thermal` switches
-     * to the model fine-tuned on thermal/infrared footage (person-only) —
-     * the regular COCO model generalises poorly to that (very different
-     * visual appearance from ordinary colour video). Long timeout — CPU
-     * inference on even a short clip takes real time (see vision.py for the
-     * sampling strategy that keeps it from taking much longer than that).
-     */
+    // Šalje video servisu za strojno učenje na analizu (YOLOv8) i vraća rezultat.
+    // thermal odabire model za termalne snimke. Analiza traje, pa je vrijeme čekanja dugo.
     public function analyzeFootage(Request $request)
     {
         $this->denyViewer();
@@ -179,10 +162,7 @@ class AiController extends Controller
 
     public function zoneModelMetrics()
     {
-        // Trains all 4 models on the full zone×day×block panel — a few
-        // minutes at the current dataset size (was tens of seconds on the
-        // much smaller original dataset), so this needs the most headroom
-        // of any ML call here.
+        // učenje sva četiri modela traje nekoliko minuta, pa je vrijeme čekanja najdulje
         return $this->proxy('/zone-model-metrics', 240);
     }
 

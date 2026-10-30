@@ -2,39 +2,19 @@
 
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | Minimum data required before a zone gets a real recommendation
-    |--------------------------------------------------------------------------
-    | Below either threshold, RecommendationService returns "insufficient_data"
-    | instead of guessing from too little history.
-    */
+    // Najmanji broj letova i minuta nadzora da bi žarište dobilo preporuku.
+    // Ispod toga preporuka je "premalo podataka".
     'min_flights_for_zone' => 5,
     'min_minutes_for_zone' => 120,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Trend escalation
-    |--------------------------------------------------------------------------
-    | If a zone would otherwise be "maintain" but its detection count over the
-    | recent window has grown by at least this percentage compared to the
-    | previous window of the same length, it's bumped up to "increase".
-    */
+    // Ako bi žarište dobilo preporuku "zadržati", a broj detekcija u zadnjem razdoblju
+    // porastao je barem za ovaj postotak, preporuka postaje "pojačati".
     'trend_escalation_pct' => 30,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Recent / previous window length (days) used for the trend comparison
-    |--------------------------------------------------------------------------
-    */
+    // Duljina razdoblja (u danima) za usporedbu trenda
     'recent_window_days' => 30,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Time-of-day blocks used to report each zone's most active period
-    |--------------------------------------------------------------------------
-    | Hour ranges are [start, end) in 24h time.
-    */
+    // Vremenski blokovi od 4 sata (početak uključen, kraj nije)
     'time_blocks' => [
         ['label' => '00:00–04:00', 'start' => 0,  'end' => 4],
         ['label' => '04:00–08:00', 'start' => 4,  'end' => 8],

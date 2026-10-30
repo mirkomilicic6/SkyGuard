@@ -7,11 +7,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Renames go through raw ALTER TABLE (not Schema::renameColumn) so this
-     * doesn't depend on doctrine/dbal being installed, and to redefine the
-     * enum value lists in the same statement as the rename.
-     */
+    // Preimenovanje stupaca i nove vrijednosti enum polja izravnim ALTER TABLE upitom,
+    // da nije potreban paket doctrine/dbal
     public function up(): void
     {
         DB::statement("ALTER TABLE detections CHANGE type detection_type ENUM('person','group','vehicle','other') NOT NULL");
@@ -41,11 +38,6 @@ return new class extends Migration
         DB::statement("ALTER TABLE detections CHANGE entity_count count SMALLINT UNSIGNED NOT NULL DEFAULT 1");
         DB::statement("ALTER TABLE detections CHANGE detection_type type ENUM('person','group','vehicle','smuggling','other') NOT NULL");
 
-        // Note: this does not restore the original camera_id/source values
-        // remapped by the preceding data migration (trail_camera→camera,
-        // ground_observation→manual, other←smuggling) — that mapping isn't
-        // reversible. The FK constraint on user_id (added back above via
-        // constrained()) is intentionally omitted here since the original
-        // table defined it inline at creation, not via a separate migration.
+        // stare vrijednosti izvora se ne vraćaju jer preslikavanje nije reverzibilno
     }
 };

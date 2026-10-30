@@ -36,7 +36,7 @@ class DashboardController extends Controller
             ? PoliceAdministration::with('stations')->orderBy('name')->get()
             : null;
 
-        // Base query: supervisor sees all station flights, pilot sees own only
+        // pilot vidi samo svoje letove, ostali sve letove svog opsega
         $flightBase = $isSupervisor
             ? $this->applyStationScope(Flight::query())
             : Flight::where('user_id', $user->id);
@@ -45,7 +45,7 @@ class DashboardController extends Controller
             ? $this->applyStationScope(Drone::query())
             : $user->drones();
 
-        // --- Stats ---
+        // statistika
         $stats = [
             'total_drones'       => (clone $droneBase)->count(),
             'active_drones'      => (clone $droneBase)->where('status', 'active')->count(),
@@ -67,7 +67,7 @@ class DashboardController extends Controller
                 ->count(),
         ];
 
-        // --- Monthly chart ---
+        // graf po mjesecima
         $availableYears = (clone $flightBase)
             ->selectRaw('YEAR(flight_date) as year')
             ->groupBy('year')
@@ -87,11 +87,11 @@ class DashboardController extends Controller
             ->pluck('count', 'month')
             ->toArray();
 
-        // --- Date filter (supervisors only) ---
+        // filter po datumu (ne za pilote)
         $dateFrom = $isSupervisor ? $request->input('date_from') : null;
         $dateTo   = $isSupervisor ? $request->input('date_to')   : null;
 
-        // --- Recent flights ---
+        // zadnji letovi
         $recentFlights = (clone $flightBase)
             ->with(['drone', 'pilot', 'station.administration'])
             ->when($dateFrom, fn($q) => $q->whereDate('flight_date', '>=', $dateFrom))
@@ -100,7 +100,7 @@ class DashboardController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        // --- Heatmap ---
+        // toplinska karta
         $heatmapPoints = GpxPoint::select('gpx_points.latitude', 'gpx_points.longitude')
             ->join('flights', 'flights.id', '=', 'gpx_points.flight_id')
             ->whereNull('flights.deleted_at')
@@ -116,7 +116,7 @@ class DashboardController extends Controller
             ->map(fn($p) => [$p->latitude, $p->longitude])
             ->values();
 
-        // --- Action queue (admin only) — faults awaiting review/accept ---
+        // kvarovi koji čekaju obradu (samo administrator)
         $pendingReview = $user->hasRole('admin')
             ? $this->applyStationScope(MaintenanceLog::where('status', MaintenanceLog::STATUS_PENDING))
                 ->with(['drone', 'reportedBy'])
@@ -125,7 +125,7 @@ class DashboardController extends Controller
                 ->get()
             : collect();
 
-        // --- Checkout widget (pilots only) ---
+        // zaduženi dron (samo pilot)
         $activeCheckout = null;
         $assignedDrones = collect();
 
@@ -154,15 +154,8 @@ class DashboardController extends Controller
         ) + ['isAdmin' => $isSupervisor, 'isSuperAdmin' => $isSuperAdmin]);
     }
 
-    /**
-     * Network-wide overview map, super admin only: detections, flight
-     * routes, hunting camera locations, and station/administration
-     * boundaries as independently toggleable layers (see resources/views/
-     * dashboard.blade.php). Deliberately its own endpoint rather than
-     * reusing AnalyticsController::spatialData() — that one is scoped to
-     * the caller's own station/administration and doesn't carry cameras or
-     * administration boundaries, both needed here.
-     */
+    // Karta cijele mreže, samo za glavnog administratora: detekcije, putanje letova,
+    // lovačke kamere te granice postaja i uprava kao zasebni slojevi.
     public function overviewMapData(Request $request)
     {
         $user = auth()->user();
@@ -171,9 +164,7 @@ class DashboardController extends Controller
         $stationId = $request->filled('station_id') ? $request->integer('station_id') : null;
         $administrationId = $request->filled('administration_id') ? $request->integer('administration_id') : null;
 
-        // A station implies its own administration, so the administration-
-        // level boundary layer stays consistent even when only a station
-        // was picked in the cascading filter.
+        // ako je odabrana postaja, prikazuje se i granica njezine uprave
         if ($stationId && !$administrationId) {
             $administrationId = BorderPoliceStation::find($stationId)?->police_administration_id;
         }
@@ -199,12 +190,8 @@ class DashboardController extends Controller
             'detected_at'    => $d->detected_at->translatedFormat('d.m.Y H:i'),
         ])->values();
 
-        // Routes: date/station-scoped only — type/source are detection-level
-        // attributes and don't apply to a whole flight. Capped and limited to
-        // the most recent matches: with tens of thousands of flights now in
-        // the dataset, eager-loading every GPX point for every match blew
-        // past the 512M web request memory limit (and would have been an
-        // unreadable mess of overlapping polylines on the map regardless).
+        // putanje letova filtriraju se samo po datumu i postaji,
+        // a prikazuje se ograničen broj najnovijih letova zbog memorije i preglednosti karte
         $routesQuery = Flight::query()
             ->when($stationId, fn($q) => $q->where('station_id', $stationId))
             ->when(!$stationId && $administrationId, fn($q) =>
@@ -346,12 +333,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * Lightweight preview of the risk-grid recommendations for the pilot's
-     * station — pure ML data, no LLM call, so it's cheap enough to load on
-     * every dashboard visit. The full natural-language version lives in the
-     * AI chat assistant.
-     */
+    // Kratki pregled preporuka iz mreže rizika za postaju pilota, bez jezičnog modela
     private function fetchAiRiskSummary(?BorderPoliceStation $station): ?array
     {
         if (!$station) {

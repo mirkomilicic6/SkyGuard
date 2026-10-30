@@ -1,4 +1,4 @@
-{{-- ── AI asistent — floating chat widget ──────────────────────────────── --}}
+{{-- AI asistent, mali prozor za razgovor --}}
 <button id="aiChatToggle" class="ai-chat-toggle" title="AI asistent">
     <i class="fas fa-robot"></i>
 </button>
@@ -35,7 +35,7 @@
 </div>
 
 <style>
-/* ── AI chat widget ───────────────────────────────────────────── */
+/* AI asistent */
 .ai-chat-toggle {
     position: fixed; bottom: 24px; right: 24px; z-index: 1050;
     width: 56px; height: 56px; border-radius: 50%;
@@ -104,7 +104,7 @@
 }
 .ai-chat-map-expand:hover { background: rgba(13,36,96,1); border-color: var(--gold); color: var(--gold); }
 
-/* ── Expanded map modal ──────────────────────────────────────── */
+/* Uvećana karta */
 .ai-chat-map-modal { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; }
 .ai-chat-map-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
 .ai-chat-map-modal-inner {
@@ -121,7 +121,7 @@
 </style>
 
 <script>
-// ── AI chat widget ────────────────────────────────────────────────────────
+// AI asistent
 (function () {
     const toggle    = document.getElementById('aiChatToggle');
     const panel     = document.getElementById('aiChatPanel');
@@ -158,9 +158,7 @@
         return points.map(p => {
             const style = MAP_KIND[p.kind] || { color: '#6f42c1', label: p.kind };
 
-            // The user's own station is a fixed reference point, not a
-            // recommendation — draw it distinctly (square icon, name instead
-            // of a risk score) so it reads as "you are here", not another pin.
+            // postaja korisnika crta se drukčije (kvadrat i naziv), kao orijentir, a ne kao preporuka
             if (p.kind === 'station') {
                 const marker = L.marker([p.lat, p.lon], {
                     icon: L.divIcon({
@@ -270,15 +268,10 @@
     });
     closeBtn.addEventListener('click', () => { panel.style.display = 'none'; });
 
-    // Hands the conversation off to the full-page assistant: the visible
-    // transcript (read straight from the DOM, so it reflects whatever the
-    // bubbles actually ended up showing) plus the raw API `history` needed
-    // to keep going. Map visualisations from earlier turns aren't part of
-    // `history`, so they aren't restored on the other side — only future
-    // turns will render maps again.
+    // prijenos razgovora na stranicu asistenta: prikazane poruke i povijest razgovora.
+    // Karte iz ranijih odgovora se ne prenose.
     expandBtn.addEventListener('click', () => {
-        // "kind" is just the bubble variant (bot/user/error), independent of
-        // either page's own CSS class prefix.
+        // kind je vrsta poruke (bot, korisnik, greška)
         const transcript = Array.from(messages.children)
             .filter(el => el.classList.contains('ai-chat-msg') && !el.classList.contains('ai-chat-map-wrap'))
             .map(el => ({ text: el.textContent, kind: el.classList.contains('ai-chat-msg-user') ? 'user'
@@ -286,7 +279,7 @@
 
         try {
             sessionStorage.setItem('aiChatTransfer', JSON.stringify({ history, transcript }));
-        } catch (e) { /* storage unavailable — full page just starts fresh */ }
+        } catch (e) { /* spremište nije dostupno, pa stranica počinje novi razgovor */ }
 
         window.location.href = '{{ route('chat.page') }}';
     });

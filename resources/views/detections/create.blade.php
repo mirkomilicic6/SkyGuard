@@ -14,7 +14,7 @@
 @section('css')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-/* ── Source selector ─────────────────────────────────────────────── */
+/* Odabir izvora */
 .source-cards { display:flex; gap:12px; margin-bottom:1.5rem; flex-wrap:wrap; }
 .source-card {
     flex:1; min-width:140px;
@@ -37,11 +37,11 @@
 .source-card i { font-size:1.6rem; margin-bottom:6px; display:block; }
 .source-card span { font-size:.82rem; font-weight:600; letter-spacing:.3px; }
 
-/* ── Source sub-sections ─────────────────────────────────────────── */
+/* Dijelovi obrasca po izvoru */
 .source-section { display:none; }
 .source-section.visible { display:block; }
 
-/* ── Map ─────────────────────────────────────────────────────────── */
+/* Karta */
 #det-map {
     height:320px;
     border-radius:10px;
@@ -54,7 +54,7 @@
     text-align:center;
 }
 
-/* ── Section divider ─────────────────────────────────────────────── */
+/* Razdjelnik */
 .form-section-label {
     font-size:.7rem;
     font-weight:700;
@@ -83,13 +83,13 @@
 
 <div class="row">
 
-{{-- ══ LEFT COLUMN ══════════════════════════════════════════════════════════ --}}
+{{-- Lijevi stupac --}}
 <div class="col-lg-7">
 
 <div class="card">
 <div class="card-body">
 
-{{-- Source selector --}}
+{{-- Odabir izvora --}}
 <p class="form-section-label" style="margin-top:0">Izvor detekcije</p>
 <div class="source-cards">
     <div class="source-card active" data-source="drone">
@@ -107,7 +107,7 @@
 </div>
 <input type="hidden" name="source" id="source-input" value="drone">
 
-{{-- Drone flight section --}}
+{{-- Let drona --}}
 <div class="source-section visible" id="sec-drone">
     <div class="form-group">
         <label>Let drona <span class="text-muted">({{ __('ui.optional') }})</span></label>
@@ -125,7 +125,7 @@
     </div>
 </div>
 
-{{-- Camera / manual sections (no flight linkage) --}}
+{{-- Kamera i ručni unos (bez leta) --}}
 <div class="source-section" id="sec-trail_camera">
     <p class="text-muted" style="font-size:.85rem">
         <i class="fas fa-info-circle mr-1"></i>
@@ -139,7 +139,7 @@
     </p>
 </div>
 
-{{-- Station (required unless a flight was picked) --}}
+{{-- Postaja (obavezna ako nije odabran let) --}}
 <div class="form-group" id="station-group">
     <label>Policijska postaja *</label>
     <select name="station_id" id="station-select" class="form-control @error('station_id') is-invalid @enderror">
@@ -151,7 +151,7 @@
     @error('station_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
 </div>
 
-{{-- Coordinates --}}
+{{-- Koordinate --}}
 <p class="form-section-label">Lokacija</p>
 <div class="row">
     <div class="col-sm-6">
@@ -176,7 +176,7 @@
     </div>
 </div>
 
-{{-- Detection details --}}
+{{-- Podaci o detekciji --}}
 <p class="form-section-label">Detalji detekcije</p>
 <div class="row">
     <div class="col-sm-4">
@@ -220,10 +220,10 @@
 
 </div>{{-- col-lg-7 --}}
 
-{{-- ══ RIGHT COLUMN ═════════════════════════════════════════════════════════ --}}
+{{-- Desni stupac --}}
 <div class="col-lg-5">
 
-{{-- Map card --}}
+{{-- Karta --}}
 <div class="card mb-3">
     <div class="card-header py-2">
         <h6 class="mb-0"><i class="fas fa-map-marker-alt mr-2 text-warning"></i>Odabir lokacije</h6>
@@ -237,7 +237,7 @@
     </div>
 </div>
 
-{{-- Submit --}}
+{{-- Spremanje --}}
 <button type="submit" class="btn btn-warning btn-block mt-2">
     <i class="fas fa-save mr-2"></i> Spremi detekciju
 </button>
@@ -252,7 +252,7 @@
 @section('js')
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ── Leaflet map ────────────────────────────────────────────────────────────
+// Karta
 const DEFAULT_CENTER = [45.15, 17.5]; // Slavonski Brod area
 const DEFAULT_ZOOM   = 9;
 
@@ -299,12 +299,12 @@ function updateCoords(lat, lon, moveMarker = true) {
     if (moveMarker && lat && lon) setMarker(parseFloat(lat), parseFloat(lon));
 }
 
-// Click on map to place marker
+// klik na kartu postavlja oznaku
 map.on('click', function (e) {
     updateCoords(e.latlng.lat.toFixed(7), e.latlng.lng.toFixed(7), true);
 });
 
-// Sync lat/lon inputs → map
+// upisane koordinate prikazuju se na karti
 ['lat-input', 'lon-input'].forEach(id => {
     document.getElementById(id).addEventListener('change', function () {
         const lat = parseFloat(document.getElementById('lat-input').value);
@@ -313,12 +313,12 @@ map.on('click', function (e) {
     });
 });
 
-// Init marker if old values exist (validation failure)
+// oznaka iz prethodnog unosa ako spremanje nije uspjelo
 const oldLat = parseFloat(document.getElementById('lat-input').value);
 const oldLon = parseFloat(document.getElementById('lon-input').value);
 if (!isNaN(oldLat) && !isNaN(oldLon)) setMarker(oldLat, oldLon);
 
-// ── Source switcher ────────────────────────────────────────────────────────
+// Promjena izvora
 const sourceCards   = document.querySelectorAll('.source-card');
 const sourceInput   = document.getElementById('source-input');
 const flightSelect  = document.getElementById('flight-select');
@@ -337,7 +337,7 @@ sourceCards.forEach(card => {
     card.addEventListener('click', () => activateSource(card.dataset.source));
 });
 
-// A picked flight auto-supplies the station — hide the manual station picker.
+// odabrani let određuje postaju, pa se odabir postaje skriva
 function syncStationRequirement() {
     const flightChosen = sourceInput.value === 'drone' && flightSelect.value;
     stationGroup.style.display = flightChosen ? 'none' : '';
@@ -346,7 +346,7 @@ function syncStationRequirement() {
 flightSelect.addEventListener('change', syncStationRequirement);
 syncStationRequirement();
 
-// ── Form validation ────────────────────────────────────────────────────────
+// Provjera obrasca
 document.getElementById('det-form').addEventListener('submit', function (e) {
     const lat = parseFloat(document.getElementById('lat-input').value);
     const lon = parseFloat(document.getElementById('lon-input').value);

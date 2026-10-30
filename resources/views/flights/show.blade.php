@@ -7,7 +7,7 @@
 
 @section('content')
 
-{{-- ── PAGE HEADER ──────────────────────────────────────────── --}}
+{{-- Zaglavlje --}}
 <div class="fs-header mb-4">
     <div class="fs-header-left">
         <a href="{{ route('flights.index') }}" class="fs-back-btn">
@@ -41,13 +41,13 @@
     </div>
 @endif
 
-{{-- ── MAIN GRID ────────────────────────────────────────────── --}}
+{{-- Glavni dio --}}
 <div class="row">
 
-{{-- LEFT COLUMN ──────────────────────────────────────────────── --}}
+{{-- Lijevi stupac --}}
 <div class="col-lg-4">
 
-    {{-- Flight Stats --}}
+    {{-- Podaci o letu --}}
     <div class="fs-card mb-3">
         <div class="fs-card-header">
             <i class="fas fa-chart-bar mr-2" style="color:var(--gold)"></i>
@@ -108,7 +108,7 @@
         @endif
     </div>
 
-    {{-- Detections Panel --}}
+    {{-- Detekcije --}}
     <div class="fs-card">
         <div class="fs-card-header">
             <div class="d-flex align-items-center gap-2" style="gap:.6rem">
@@ -153,12 +153,12 @@
         </div>
     </div>
 
-</div>{{-- /left col --}}
+</div>{{-- kraj lijevog stupca --}}
 
-{{-- RIGHT COLUMN ─────────────────────────────────────────────── --}}
+{{-- Desni stupac --}}
 <div class="col-lg-8">
 
-    {{-- Map --}}
+    {{-- Karta --}}
     <div class="fs-card mb-3">
         <div class="fs-card-header">
             <i class="fas fa-map-marked-alt mr-2" style="color:var(--gold)"></i>
@@ -180,7 +180,7 @@
         @endif
     </div>
 
-    {{-- Altitude chart --}}
+    {{-- Graf visine --}}
     @if($flight->gpxPoints->count() > 0)
     <div class="fs-card">
         <div class="fs-card-header">
@@ -193,12 +193,10 @@
     </div>
     @endif
 
-</div>{{-- /right col --}}
-</div>{{-- /row --}}
+</div>{{-- kraj desnog stupca --}}
+</div>{{-- kraj retka --}}
 
-{{-- ================================================================
-     DETECTION MODAL (dark themed)
-     ================================================================ --}}
+{{-- Prozor za unos detekcije --}}
 @if(!auth()->user()->hasRole('viewer'))
 <div class="fs-modal-backdrop" id="detModal" style="display:none" onclick="if(event.target===this)closeDetModal()">
     <div class="fs-modal">
@@ -213,7 +211,7 @@
             <input type="hidden" id="det_lat">
             <input type="hidden" id="det_lon">
 
-            {{-- Coordinates --}}
+            {{-- Koordinate --}}
             <div class="fs-modal-coords mb-3">
                 <div class="fs-coord-box">
                     <div class="fs-coord-label">{{ __('ui.detections.latitude') }}</div>
@@ -226,7 +224,7 @@
                 </div>
             </div>
 
-            {{-- Type --}}
+            {{-- Vrsta --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.type') }}</label>
                 <div class="fs-type-grid" id="typeGrid">
@@ -246,7 +244,7 @@
                 <input type="hidden" id="det_type" value="person">
             </div>
 
-            {{-- Count --}}
+            {{-- Broj --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.count') }}</label>
                 <div class="fs-count-row">
@@ -256,14 +254,14 @@
                 </div>
             </div>
 
-            {{-- Notes --}}
+            {{-- Napomena --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.notes') }} <span class="fs-optional">({{ __('ui.optional') }})</span></label>
                 <textarea id="det_note" class="fs-textarea" rows="2" maxlength="500"
                           placeholder="{{ __('ui.detections.notes_placeholder') ?? '' }}"></textarea>
             </div>
 
-            {{-- Time --}}
+            {{-- Vrijeme --}}
             <div class="fs-form-group">
                 <label class="fs-label">{{ __('ui.detections.detected_at') }} <span class="fs-optional">({{ __('ui.optional') }})</span></label>
                 <input type="datetime-local" id="det_detected_at" class="fs-input">
@@ -284,10 +282,10 @@
 @section('css')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-/* ── HIDE CONTENT HEADER ─────────────────────────────── */
+/* Skriveno zaglavlje */
 .content-header { display: none; }
 
-/* ── PAGE HEADER ─────────────────────────────────────── */
+/* Zaglavlje */
 .fs-header {
     display: flex;
     align-items: center;
@@ -337,7 +335,7 @@
 .fs-link { color: var(--gold) !important; text-decoration: none; }
 .fs-link:hover { text-decoration: underline; }
 
-/* ── CARD ────────────────────────────────────────────── */
+/* Kartica */
 .fs-card {
     background: var(--navy-card);
     border: 1px solid rgba(255,255,255,.06);
@@ -364,7 +362,7 @@
 
 .fs-hint-label { font-size: .7rem; color: rgba(255,255,255,.3); font-weight: 400; white-space: nowrap; }
 
-/* ── STAT GRID ───────────────────────────────────────── */
+/* Podaci o letu */
 .fs-stat-grid { display: grid; grid-template-columns: 1fr 1fr; }
 .fs-stat {
     display: flex;
@@ -384,7 +382,7 @@
 .fs-stat-val { font-size: .88rem; font-weight: 600; color: #fff; }
 .fs-stat-lbl { font-size: .68rem; color: rgba(255,255,255,.35); margin-top: 1px; text-transform: uppercase; letter-spacing: .4px; }
 
-/* ── DETECTION LIST ──────────────────────────────────── */
+/* Popis detekcija */
 .fs-detection-list { padding: .4rem 0; max-height: 340px; overflow-y: auto; }
 .fs-det-item {
     display: flex;
@@ -440,7 +438,7 @@
 }
 .fs-det-empty i { font-size: 1.6rem; }
 
-/* ── EMPTY MAP ───────────────────────────────────────── */
+/* Prazna karta */
 .fs-empty-map {
     height: 220px;
     display: flex; flex-direction: column;
@@ -449,7 +447,7 @@
 }
 .fs-empty-map div { font-size: .9rem; }
 
-/* ── MODAL ───────────────────────────────────────────── */
+/* Prozor */
 .fs-modal-backdrop {
     position: fixed; inset: 0;
     background: rgba(0,0,0,.6);
@@ -489,7 +487,7 @@
     border-top: 1px solid rgba(255,255,255,.08);
 }
 
-/* Coordinates */
+/* Koordinate */
 .fs-modal-coords {
     display: flex; align-items: center; gap: .5rem;
     background: rgba(0,0,0,.25);
@@ -502,7 +500,7 @@
 .fs-coord-val { font-size: .82rem; font-weight: 600; color: #fff; margin-top: 2px; font-family: monospace; }
 .fs-coord-sep { color: rgba(255,255,255,.2); font-size: 1rem; }
 
-/* Form elements */
+/* Polja obrasca */
 .fs-form-group { margin-bottom: 1rem; }
 .fs-label {
     display: block;
@@ -528,7 +526,7 @@
 }
 .fs-textarea { resize: none; }
 
-/* Type selector */
+/* Odabir vrste */
 .fs-type-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: .4rem; }
 .fs-type-btn {
     display: flex; flex-direction: column;
@@ -554,7 +552,7 @@
     color: #fff;
 }
 
-/* Count row */
+/* Broj */
 .fs-count-row { display: flex; align-items: center; gap: .5rem; width: 140px; }
 .fs-count-btn {
     width: 34px; height: 34px; border-radius: 8px;
@@ -573,7 +571,7 @@
     padding: 6px; font-size: .9rem; font-weight: 600;
 }
 
-/* Buttons */
+/* Gumbi */
 .fs-btn-cancel {
     padding: 8px 18px; border-radius: 9px;
     background: rgba(255,255,255,.07);
@@ -594,10 +592,10 @@
 .fs-btn-save:hover { background: rgba(244,109,67,.35); color: #fff; }
 .fs-btn-save:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Map cursor */
+/* Pokazivač na karti */
 #map { cursor: crosshair; }
 
-/* Leaflet popup dark */
+/* Tamni skočni prozor na karti */
 .leaflet-popup-content-wrapper {
     background: #0d2460 !important;
     border: 1px solid rgba(255,255,255,.12) !important;
@@ -653,7 +651,7 @@ const i18n = {
     altLabel:      "{{ __('ui.flights.altitude_label') }}",
 };
 
-// ── MAP ──────────────────────────────────────────────────────
+// Karta
 const latlngs = gpxPoints.map(p => [p.lat, p.lon]);
 const map = L.map('map');
 
@@ -661,13 +659,13 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap', maxZoom: 19
 }).addTo(map);
 
-// Flight path — dark casing underneath for contrast against the light basemap
+// putanja leta s tamnim rubom da se bolje vidi na svijetloj podlozi
 L.polyline(latlngs, { color: '#0d2460', weight: 5, opacity: 0.9 }).addTo(map);
 L.polyline(latlngs, { color: '#f0c040', weight: 2.5, opacity: 0.95 }).addTo(map);
 const bounds = L.latLngBounds(latlngs);
 map.fitBounds(bounds, { padding: [25, 25] });
 
-// Start / End markers
+// oznake početka i kraja
 const dotIcon = (color) => L.divIcon({
     className: '', iconSize: [14, 14], iconAnchor: [7, 7],
     html: `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.5)"></div>`
@@ -678,7 +676,7 @@ const last = gpxPoints[gpxPoints.length - 1];
 L.marker([last.lat, last.lon], { icon: dotIcon('#dc3545') }).addTo(map)
   .bindPopup('<strong style="color:#f5a0a0">End</strong>' + (last.time ? '<br><small>' + last.time + '</small>' : ''));
 
-// Waypoints
+// međutočke
 const step = Math.max(1, Math.floor(gpxPoints.length / 8));
 gpxPoints.forEach((p, i) => {
     if (i === 0 || i === gpxPoints.length - 1 || i % step !== 0) return;
@@ -687,7 +685,7 @@ gpxPoints.forEach((p, i) => {
      .bindPopup([p.time ? '<small>'+p.time+'</small>' : '', p.alt != null ? 'Alt: <strong>'+p.alt+' m</strong>' : '', p.speed != null ? 'Speed: <strong>'+p.speed+' km/h</strong>' : ''].filter(Boolean).join('<br>'));
 });
 
-// ── DETECTION PINS ───────────────────────────────────────────
+// Oznake detekcija
 const detectionMarkers = {};
 
 function makePin(color) {
@@ -717,9 +715,9 @@ function addDetectionMarker(d) {
 
 existingDetections.forEach(addDetectionMarker);
 
-// ── MODAL LOGIC ───────────────────────────────────────────────
+// Prozor za unos detekcije
 @if(!auth()->user()->hasRole('viewer'))
-// Select first type button by default
+// prva vrsta je odabrana unaprijed
 document.querySelector('.fs-type-btn[data-value="person"]')?.classList.add('active');
 
 function openDetModal(lat, lng) {
@@ -786,7 +784,7 @@ document.getElementById('btnSaveDetection').addEventListener('click', function()
     });
 });
 
-// Delete from list
+// brisanje s popisa
 document.addEventListener('click', function(e) {
     const btn = e.target.closest('.fs-det-delete');
     if (!btn) return;
@@ -840,7 +838,7 @@ function updateCount(delta) {
 }
 @endif
 
-// ── ALTITUDE CHART ───────────────────────────────────────────
+// Graf visine
 const altCtx  = document.getElementById('altitudeChart').getContext('2d');
 const altGrad = altCtx.createLinearGradient(0, 0, 0, 180);
 altGrad.addColorStop(0, 'rgba(111,66,193,0.4)');

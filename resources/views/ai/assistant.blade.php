@@ -272,10 +272,8 @@
     sendBtn.addEventListener('click', send);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 
-    // A conversation handed off from the floating widget (see
-    // partials/ai-chat-widget.blade.php's "expand" button) arrives here via
-    // sessionStorage: the visible transcript to re-render, plus the raw API
-    // `history` needed to keep the conversation going server-side.
+    // razgovor prenesen iz malog prozora asistenta (preko sessionStorage):
+    // prikazane poruke i povijest razgovora za nastavak
     try {
         const raw = sessionStorage.getItem('aiChatTransfer');
         if (raw) {
@@ -289,7 +287,7 @@
                 history = data.history;
             }
         }
-    } catch (e) { /* ignore malformed/unavailable transfer data */ }
+    } catch (e) { /* neispravni ili nedostupni podaci se zanemaruju */ }
 
     input.focus();
 })();

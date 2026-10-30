@@ -13,8 +13,7 @@ return new class extends Migration {
             $table->decimal('longitude', 9, 6)->nullable()->after('latitude');
         });
 
-        // Approximate town-centre coordinates for each PGP (border police station) —
-        // accurate enough for local weather lookups.
+        // približne koordinate središta mjesta svake postaje, dovoljne za vremensku prognozu
         foreach ($this->coordinates() as $name => [$lat, $lon]) {
             DB::table('border_police_stations')
                 ->where('name', $name)

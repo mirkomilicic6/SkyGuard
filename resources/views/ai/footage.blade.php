@@ -73,9 +73,8 @@
         stage.style.display = 'block';
     });
 
-    // Boxes are only known for the ~2/s sampled frames the video was
-    // analysed at — hold whichever sample is closest to the current
-    // playback time rather than trying to interpolate between them.
+    // okviri postoje samo za analizirane kadrove (oko 2 u sekundi),
+    // pa se prikazuje kadar najbliži trenutnom vremenu videa
     function nearestFrame(t) {
         if (!frames.length) return null;
         let best = frames[0];

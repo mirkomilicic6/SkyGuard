@@ -13,10 +13,8 @@ class SearchController extends Controller
 {
     use StationScoped;
 
-    /**
-     * Live global search for admins — drones, pilots, stations, administrations.
-     * Scoped to the admin's own administration; unrestricted for the super admin.
-     */
+    // Pretraga za administratore (dronovi, piloti, postaje, uprave).
+    // Administrator pretražuje svoju upravu, glavni administrator sve.
     public function index(Request $request)
     {
         $q = trim((string) $request->input('q', ''));

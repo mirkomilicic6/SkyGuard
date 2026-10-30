@@ -22,7 +22,7 @@
 </div>
 @endif
 
-{{-- ── Filters ──────────────────────────────────────────────────────────── --}}
+{{-- Filteri --}}
 <div class="card card-outline card-primary mb-3">
     <div class="card-body py-2">
         <form method="GET" action="{{ route('detections.index') }}" class="form-inline flex-wrap" id="filter-form" style="gap:.5rem">
@@ -48,7 +48,7 @@
             </select>
             @endif
 
-            {{-- Postaja filter za admina cijele uprave --}}
+            {{-- Filter postaje za administratora uprave --}}
             @if($stations)
             <select name="station_id" class="form-control form-control-sm">
                 <option value="">— Sve postaje —</option>
@@ -106,7 +106,7 @@
     </div>
 </div>
 
-{{-- ── Table ─────────────────────────────────────────────────────────────── --}}
+{{-- Tablica --}}
 <div class="card">
     <div class="card-body p-0">
         <table class="table table-striped mb-0">

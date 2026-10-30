@@ -8,12 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BorderPoliceStation extends Model
 {
-    /**
-     * Radius (km) treated as this station's territory for now — just a
-     * simple circle around its coordinate, not a real administrative
-     * boundary. Used both for the map overlay and for placing new records
-     * (e.g. cameras) within a plausible area of the station.
-     */
+    // Polumjer (km) koji se smatra područjem postaje kad granica nije ucrtana.
+    // Koristi se za prikaz na karti i za smještaj novih zapisa, npr. kamera.
     public const TERRITORY_RADIUS_KM = 10.0;
 
     protected $fillable = ['police_administration_id', 'name', 'latitude', 'longitude', 'boundary', 'landmark'];
@@ -29,13 +25,8 @@ class BorderPoliceStation extends Model
         return $this->belongsTo(PoliceAdministration::class, 'police_administration_id');
     }
 
-    /**
-     * A uniformly-random [lat, lon] point within this station's territory
-     * radius (sqrt of a uniform random fraction is used for the distance,
-     * otherwise points would cluster unrealistically near the centre).
-     *
-     * @return array{0: float, 1: float}
-     */
+    // Nasumična točka unutar područja postaje.
+    // Korijen udaljenosti služi da se točke ne gomilaju oko središta.
     public function randomPointWithinTerritory(?float $radiusKm = null): array
     {
         $radiusKm ??= self::TERRITORY_RADIUS_KM;
@@ -56,11 +47,8 @@ class BorderPoliceStation extends Model
         return !empty($this->boundary) && count($this->boundary) >= 3;
     }
 
-    /**
-     * Whether (lat, lon) falls within this station's territory. Uses the
-     * hand-drawn boundary polygon if one has been drawn; otherwise falls
-     * back to the simple 10km radius circle.
-     */
+    // Je li točka unutar područja postaje: unutar ucrtane granice,
+    // a ako granica nije ucrtana, unutar kruga od 10 km.
     public function containsPoint(float $lat, float $lon): bool
     {
         if ($this->hasBoundary()) {
@@ -68,7 +56,7 @@ class BorderPoliceStation extends Model
         }
 
         if ($this->latitude === null) {
-            return true; // no reference point to check against — allow
+            return true; // postaja nema koordinate, pa se točka prihvaća
         }
 
         return $this->distanceKm($lat, $lon) <= self::TERRITORY_RADIUS_KM;
@@ -85,11 +73,7 @@ class BorderPoliceStation extends Model
         return sqrt($dLat ** 2 + $dLon ** 2);
     }
 
-    /**
-     * Standard ray-casting point-in-polygon test.
-     *
-     * @param  array<int, array{0: float, 1: float}>  $polygon  [lat, lon] pairs
-     */
+    // Provjera nalazi li se točka unutar poligona (ray casting), poligon je popis parova [lat, lon]
     private static function pointInPolygon(float $lat, float $lon, array $polygon): bool
     {
         $inside = false;

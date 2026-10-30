@@ -12,7 +12,7 @@ use Illuminate\Database\Seeder;
 
 class BorderFlightSeeder extends Seeder
 {
-    // Border patrol areas along Bosnia-Croatia border (Velika Kladuša / Bihać corridor)
+    // područja nadzora uz granicu s BiH (Velika Kladuša, Bihać)
     private array $areas = [
         ['lat' => 45.170, 'lon' => 15.785, 'name' => 'Maljevac – Velika Kladuša'],
         ['lat' => 45.140, 'lon' => 15.745, 'name' => 'Šturlić crossing'],
@@ -26,7 +26,7 @@ class BorderFlightSeeder extends Seeder
         ['lat' => 44.875, 'lon' => 15.875, 'name' => 'South Bihać corridor'],
     ];
 
-    // 50 pre-defined detection hotspots along the border
+    // 50 unaprijed zadanih žarišta uz granicu
     private array $hotspots = [
         ['lat' => 45.1715, 'lon' => 15.7820, 'types' => ['person', 'group']],
         ['lat' => 45.1680, 'lon' => 15.7905, 'types' => ['person']],
@@ -149,7 +149,7 @@ class BorderFlightSeeder extends Seeder
 
             GpxPoint::insert($rows);
 
-            // Add 0-3 detections near hotspots that fall within flight bounding box
+            // 0 do 3 detekcije uz žarišta koja su u području leta
             $this->seedDetections($flight, $points, $pilot->id, $flightDate);
 
             $this->command->getOutput()->write('.');
@@ -176,7 +176,7 @@ class BorderFlightSeeder extends Seeder
 
         if (empty($nearby)) return;
 
-        // Pick 0–3 hotspots randomly (weighted: 60% chance of at least one)
+        // nasumično 0 do 3 žarišta (60 % šanse za barem jedno)
         if (rand(1, 100) > 60) return;
 
         $count = rand(1, min(3, count($nearby)));
@@ -188,7 +188,7 @@ class BorderFlightSeeder extends Seeder
             $hotspot = $nearbyValues[$idx];
             $type    = $hotspot['types'][array_rand($hotspot['types'])];
 
-            // Small jitter so repeat sightings at same hotspot don't stack exactly
+            // malo odstupanje da se detekcije na istom žarištu ne preklapaju
             $lat = $hotspot['lat'] + (rand(-50, 50) / 100000);
             $lon = $hotspot['lon'] + (rand(-50, 50) / 100000);
 
@@ -230,20 +230,20 @@ class BorderFlightSeeder extends Seeder
 
     private function generateBorderPatrol(array $center, Carbon $startTime): array
     {
-        // Border patrols follow the border line (roughly NW-SE), so corridor pattern
+        // let prati granicu (otprilike sjeverozapad-jugoistok)
         $pointCount = rand(40, 70);
         $interval   = rand(8, 14);
 
-        // Random bearing along the border (roughly 135-165 degrees = SE, or reverse)
+        // nasumični smjer uz granicu (oko 135-165 stupnjeva ili obrnuto)
         $bearing  = rand(0, 1) ? rand(130, 165) : rand(310, 345);
         $rad      = deg2rad($bearing);
-        $dist     = 0.020 + lcg_value() * 0.030; // longer corridor for border patrol
+        $dist     = 0.020 + lcg_value() * 0.030; // dulji pojas leta uz granicu
         $offset   = 0.0005;
 
         $endLat = $center['lat'] + $dist * cos($rad);
         $endLon = $center['lon'] + $dist * sin($rad);
 
-        // Back-and-forth sweep
+        // let tamo-amo
         $waypoints = [
             [$center['lat'],           $center['lon']          ],
             [$endLat,                  $endLon                 ],
@@ -266,7 +266,7 @@ class BorderFlightSeeder extends Seeder
         $time = $start->copy();
         $prev = null;
 
-        // Takeoff climb
+        // polijetanje
         $firstWp = $waypoints[0];
         for ($i = 0; $i < $climbPoints; $i++) {
             $frac   = $i / $climbPoints;
@@ -274,7 +274,7 @@ class BorderFlightSeeder extends Seeder
             $time->addSeconds($interval);
         }
 
-        // Cruise
+        // let
         for ($w = 0; $w < count($waypoints) - 1; $w++) {
             $a = $waypoints[$w];
             $b = $waypoints[$w + 1];
@@ -294,7 +294,7 @@ class BorderFlightSeeder extends Seeder
             }
         }
 
-        // Descent
+        // spuštanje
         $lastWp = $waypoints[count($waypoints) - 1];
         for ($i = $descentPoints; $i >= 0; $i--) {
             $frac   = $i / $descentPoints;

@@ -157,10 +157,7 @@ class DroneController extends Controller
             ->get();
     }
 
-    /**
-     * Build the (administration, station) option lists used to filter the
-     * pilot-assignment select on the drone create/edit forms.
-     */
+    // Popisi uprava i postaja za odabir pilota na obrascu drona
     private function pilotFilterData($pilots)
     {
         $stations = $pilots->pluck('station')->filter()->unique('id')->sortBy('name')->values();

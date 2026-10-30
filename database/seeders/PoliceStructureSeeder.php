@@ -12,7 +12,7 @@ class PoliceStructureSeeder extends Seeder
 {
     public function run(): void
     {
-        // --- Permissions ---
+        // ovlasti
         $permissions = [
             'view drones',    'manage drones',
             'view flights',   'manage flights',
@@ -26,7 +26,7 @@ class PoliceStructureSeeder extends Seeder
             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
         }
 
-        // --- Roles ---
+        // uloge
         $adminRole  = Role::firstOrCreate(['name' => 'admin',  'guard_name' => 'web']);
         $pilotRole  = Role::firstOrCreate(['name' => 'pilot',  'guard_name' => 'web']);
         $viewerRole = Role::firstOrCreate(['name' => 'viewer', 'guard_name' => 'web']);
@@ -57,8 +57,7 @@ class PoliceStructureSeeder extends Seeder
             'manage station boundary',
         ]);
 
-        // --- Police Administrations & Stations ---
-        // Coordinates are approximate town-centre locations, accurate enough for local weather lookups.
+        // uprave i postaje, koordinate su približna središta mjesta
         $structure = [
             'PU Karlovačka' => [
                 'PGP Slunj'     => [45.1108, 15.5828],

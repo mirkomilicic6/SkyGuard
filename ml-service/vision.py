@@ -1,39 +1,18 @@
-"""
-Person + wildlife detection on uploaded footage using pretrained YOLOv8
-models — no training involved, pure off-the-shelf inference. This is the
-beginning of the planned "Analiza snimke" (footage analysis) feature,
-separate from every other approach in this service (all of which work on
-GPS/timestamp detection records, never on actual video).
-
-Two separate models, picked by the caller (`thermal=` flag), because a model
-trained on ordinary colour photos generalises poorly to thermal/infrared
-footage — very different visual appearance (heat signature vs. colour/texture):
-  - yolov8n.pt        — COCO weights (person + wildlife/livestock), for
-                        ordinary drone/camera video.
-  - thermal_model.pt  — pitangent-ds/YOLOv8-human-detection-thermal
-                        (https://huggingface.co/pitangent-ds/YOLOv8-human-detection-thermal,
-                        AGPL-3.0), fine-tuned specifically on thermal imagery.
-                        Single class only ("HUMAN") — no animal classes for
-                        thermal footage yet.
-
-The video isn't analysed frame-by-frame (30+ fps would be far too slow on
-CPU) — it's *sampled* at `sample_fps` (default 2 frames/second) and only
-those sampled frames are run through YOLO. The frontend plays the original
-video and overlays boxes for whichever sampled frame is closest to the
-current playback time, which reads as "live" detection during playback even
-though every frame was actually analysed up front, before playback starts.
-"""
+# Prepoznavanje osoba i životinja na snimkama pomoću gotovih YOLOv8 modela (bez učenja).
+# Koriste se dva modela: običan COCO model za snimke u boji i poseban model za termalne snimke,
+# jer model učen na fotografijama u boji slabo radi na termalnim snimkama.
+#  - yolov8n.pt: COCO model (osobe i životinje)
+#  - thermal_model.pt: pitangent-ds/YOLOv8-human-detection-thermal (AGPL-3.0), prepoznaje samo osobe
+# Video se ne analizira kadar po kadar nego se uzima nekoliko kadrova u sekundi (sample_fps),
+# a stranica tijekom reprodukcije prikazuje okvire najbližeg analiziranog kadra.
 
 import cv2
 from ultralytics import YOLO
 
-MODEL_PATH = "yolov8n.pt"  # nano model — fastest, good enough for CPU inference
+MODEL_PATH = "yolov8n.pt"  # najmanji model, dovoljno brz za rad na procesoru
 THERMAL_MODEL_PATH = "thermal_model.pt"
 
-# COCO class ids this app cares about: person, plus the wildlife/livestock
-# categories actually plausible on a Croatian border-area drone/camera feed.
-# COCO also has elephant/zebra/giraffe (ids 20, 22, 23) — left out, they'd
-# never legitimately appear here and would only ever be false positives.
+# COCO razredi koji nas zanimaju: osoba i životinje koje se realno mogu pojaviti uz granicu
 DETECT_CLASSES = {
     0: "Osoba",
     14: "Ptica",
@@ -45,19 +24,15 @@ DETECT_CLASSES = {
     21: "Medvjed",
 }
 
-# The thermal model only knows one class ("HUMAN", id 0) — translated to the
-# same "Osoba" label the regular model uses, so the frontend doesn't need to
-# know or care which model actually produced a box.
+# Termalni model zna samo razred "HUMAN", koji se prikazuje kao "Osoba"
 THERMAL_CLASSES = {0: "Osoba"}
 
 _model: YOLO | None = None
 _thermal_model: YOLO | None = None
 
 
+# Model se učitava samo jednom jer učitavanje traje nekoliko sekundi
 def _get_model() -> YOLO:
-    """Loads the model once per process (loading it is slow — seconds — so
-    every request reusing the same instance matters far more here than for
-    the scikit-learn models elsewhere, which are cheap to retrain per request)."""
     global _model
     if _model is None:
         _model = YOLO(MODEL_PATH)
@@ -71,15 +46,10 @@ def _get_thermal_model() -> YOLO:
     return _thermal_model
 
 
+# Analizira uzorak kadrova iz videa i vraća okvire s koordinatama od 0 do 1,
+# kako bi ih stranica mogla prikazati bez obzira na veličinu videa
 def analyze_video(path: str, sample_fps: float = 2.0, conf_threshold: float = 0.35,
                    max_seconds: float = 60.0, thermal: bool = False) -> dict:
-    """
-    Runs detection on a sample of frames from the video at `path`, using the
-    thermal-specific model when `thermal=True` and the regular COCO model
-    otherwise. Returns normalised (0-1) box coordinates so the frontend can
-    scale them to whatever size the <video> element is actually displayed
-    at, regardless of the source video's real resolution.
-    """
     model = _get_thermal_model() if thermal else _get_model()
     class_map = THERMAL_CLASSES if thermal else DETECT_CLASSES
     class_ids = list(class_map.keys())
@@ -92,10 +62,7 @@ def analyze_video(path: str, sample_fps: float = 2.0, conf_threshold: float = 0.
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / native_fps if native_fps > 0 else 0.0
 
-    # Sample every Nth frame so total analysis time stays roughly
-    # (video length in seconds) / sample_fps * (time per YOLO call) — not
-    # (video length) * native_fps, which would be 10-15x slower for nothing:
-    # a person's position barely changes frame-to-frame at 25-30fps.
+    # Analizira se svaki N-ti kadar, jer se položaj osobe između susjednih kadrova gotovo ne mijenja
     frame_step = max(1, round(native_fps / sample_fps))
     max_frames = int(max_seconds * native_fps) if max_seconds else total_frames
 
