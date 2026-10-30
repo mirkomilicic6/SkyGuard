@@ -19,17 +19,21 @@ class RecommendationService
      * minutes guardrail is always "insufficient_data"; the model's
      * probability is never allowed to force a reduction on its own.
      */
-    public function forDbscanZones(?int $administrationId = null, ?int $stationId = null): Collection
+    public function forDbscanZones(?int $administrationId = null, ?int $stationId = null,
+                                   ?int $dow = null, ?int $block = null): Collection
     {
         $base = config('services.ml.url');
         $param = array_filter([
             'administration_id' => $administrationId,
             'station_id'        => $administrationId ? null : $stationId,
         ]);
+        // dow/block can legitimately be 0 (Monday / 00:00–04:00), so they're
+        // filtered on null, not on falsiness like the scope ids above.
+        $predictionParam = $param + array_filter(['dow' => $dow, 'block' => $block], fn ($v) => $v !== null);
 
         try {
             $flightStats = Http::timeout(60)->get("{$base}/zones/flight-stats", $param)->json('zones') ?? [];
-            $predictions = Http::timeout(90)->get("{$base}/zone-predictions", $param)->json('zones') ?? [];
+            $predictions = Http::timeout(240)->get("{$base}/zone-predictions", $predictionParam)->json('zones') ?? [];
         } catch (\Throwable) {
             return collect();
         }
@@ -65,6 +69,7 @@ class RecommendationService
                 'flights_count'     => $flightsCount,
                 'total_hours'       => $stats['total_hours'] ?? 0,
                 'detections_count'  => $stats['detections_count'] ?? 0,
+                'recent_count'      => $stats['recent_count'] ?? 0,
                 'rate_per_hour'     => $stats['rate_per_hour'] ?? 0,
                 'most_active_dow'   => $stats['most_active_dow'] ?? null,
                 'most_active_block' => $this->blockFromIndex($stats['most_active_block'] ?? null),
@@ -93,11 +98,12 @@ class RecommendationService
         $when  = $day && $block ? "{$day} između {$block}" : 'u bilo koje doba';
 
         $trendWord = $z['trend_pct'] > 0 ? 'više' : ($z['trend_pct'] < 0 ? 'manje' : 'jednako');
-        $trendPart = "U posljednjih " . config('surveillance.recent_window_days') . " dana zabilježeno je "
-            . "{$z['detections_count']} detekcija, " . abs($z['trend_pct']) . "% {$trendWord} nego u prethodnom razdoblju.";
+        $trendPart = "U posljednjih " . config('surveillance.recent_window_days') . " dana "
+            . $this->detectionsPhrase((int) $z['recent_count']) . ', '
+            . abs($z['trend_pct']) . "% {$trendWord} nego u prethodnom razdoblju.";
 
         $probPart = $z['probability'] !== null
-            ? "Model procjenjuje {$z['probability']}% vjerojatnosti detekcije. "
+            ? "Indeks rizika prema modelu: {$z['probability']}/100. "
             : '';
 
         return match ($type) {
@@ -105,8 +111,24 @@ class RecommendationService
                 . config('surveillance.min_flights_for_zone') . ' letova i '
                 . config('surveillance.min_minutes_for_zone') . ' minuta nadzora za pouzdanu preporuku.',
             'increase'           => "Preporučuje se pojačati nadzor zone {$id} {$when}. {$probPart}{$trendPart}",
-            'consider_reduction' => "Zona {$id} pokazuje nisku procijenjenu vjerojatnost detekcije u odnosu na uloženo vrijeme nadzora — razmotriti smanjenje. {$probPart}{$trendPart}",
+            'consider_reduction' => "Zona {$id} ima nizak indeks rizika u odnosu na uloženo vrijeme nadzora — razmotriti smanjenje. {$probPart}{$trendPart}",
             default              => "Zadržati trenutnu razinu nadzora zone {$id}. {$probPart}{$trendPart}",
         };
+    }
+
+    /** Croatian number agreement: 1 → "zabilježena je 1 detekcija", 2–4 → "zabilježene su", otherwise "zabilježeno je". */
+    private function detectionsPhrase(int $n): string
+    {
+        $mod10 = $n % 10;
+        $mod100 = $n % 100;
+
+        if ($mod10 === 1 && $mod100 !== 11) {
+            return "zabilježena je {$n} detekcija";
+        }
+        if ($mod10 >= 2 && $mod10 <= 4 && ($mod100 < 12 || $mod100 > 14)) {
+            return "zabilježene su {$n} detekcije";
+        }
+
+        return "zabilježeno je {$n} detekcija";
     }
 }

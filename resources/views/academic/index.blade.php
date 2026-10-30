@@ -146,7 +146,7 @@
     <div id="recMap" style="height:460px;border-radius:0 0 12px 12px"></div>
     <div class="table-responsive">
         <table class="table table-sm table-striped mb-0" style="font-size:.8rem">
-            <thead><tr><th>Zona</th><th>Preporuka</th><th>Vjerojatnost</th><th>Letova</th><th>Sati</th><th>Objašnjenje</th></tr></thead>
+            <thead><tr><th>Zona</th><th>Preporuka</th><th>Indeks rizika</th><th>Letova</th><th>Sati</th><th>Objašnjenje</th></tr></thead>
             <tbody id="recTable"><tr><td colspan="6" class="text-center py-3 text-muted">Učitavanje...</td></tr></tbody>
         </table>
     </div>
@@ -199,7 +199,7 @@
                 </tr>
                 <tr>
                     <td><b>Evaluacija</b></td>
-                    <td>Kronološki train/test split (80/20 po datumu) — trening na prošlosti, test na budućnosti</td>
+                    <td>Kronološka podjela 60/20/20 po datumu (trening / validacija za odabir praga / test) — trening na prošlosti, test na budućnosti</td>
                     <td>Nasumičan stratificirani split (dev dijagnostika) — sam kod to označava kao privremeno, ne rigorozno rješenje</td>
                     <td>Nema formalne evaluacije</td>
                 </tr>
@@ -465,7 +465,7 @@ async function loadPredictiveMap() {
         zs.forEach(z => {
             const color = tierColor[z.tier] || '#6c757d';
             const label = z.probability !== null
-                ? `Predviđena vjerojatnost detekcije: ${z.probability}%`
+                ? `Indeks rizika: ${z.probability} / 100`
                 : 'Nedovoljno podataka';
             L.circle([z.lat, z.lon], { radius: Math.max(z.radius_km * 1000, 500), color, fillColor: color, fillOpacity: 0.22, weight: 2 })
                 .bindPopup(`<b>${z.id}</b><br><small>${label}<br>
@@ -503,7 +503,7 @@ async function loadRecommendations() {
             .map(z => `<tr>
                 <td><b>${z.id}</b></td>
                 <td><span style="color:${recColor[z.type]}">●</span> ${recLabel[z.type]}</td>
-                <td>${z.probability !== null ? z.probability + '%' : '—'}</td>
+                <td>${z.probability !== null ? z.probability : '—'}</td>
                 <td>${z.flights_count}</td>
                 <td>${z.total_hours}</td>
                 <td><small>${z.explanation}</small></td>

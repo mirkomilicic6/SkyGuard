@@ -142,9 +142,10 @@
 
     const MAP_KIND = {
         increase:   { color: '#dc3545', label: 'Pojačati nadzor' },
-        decrease:   { color: '#28a745', label: 'Smanjiti nadzor' },
-        cluster:    { color: '#fd7e14', label: 'Klaster detekcija' },
-        prediction: { color: '#6f42c1', label: 'Procjena lokacije' },
+        maintain:   { color: '#fd7e14', label: 'Zadržati nadzor' },
+        decrease:   { color: '#28a745', label: 'Razmotriti smanjenje' },
+        cluster:    { color: '#6f42c1', label: 'Žarište detekcija' },
+        insufficient: { color: '#8a94a6', label: 'Premalo podataka' },
         station:    { color: '#f0c040', label: 'Vaša postaja' },
     };
 
@@ -175,7 +176,7 @@
             const marker = L.circleMarker([p.lat, p.lon], {
                 radius: 8, color: style.color, fillColor: style.color, fillOpacity: 0.75, weight: 2,
             }).addTo(map);
-            const valueLine = (p.value ?? null) !== null ? `<br>Rizik: ${p.value}` : '';
+            const valueLine = (p.value ?? null) !== null ? `<br>Zona ${p.value}` : '';
             const nearLine = p.near ? `<br>${p.near}` : '';
             marker.bindPopup(`<strong>${style.label}</strong>${nearLine}<br><small>${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</small>${valueLine}`);
             return marker;
