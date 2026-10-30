@@ -315,9 +315,9 @@ def zones_dataset_preview(station_id: int = None, administration_id: int = None,
 # ── 5-model comparison on the zone timeline dataset (chronological split) ─────
 @app.get("/zone-model-metrics")
 def zone_model_metrics(station_id: int = None, administration_id: int = None):
-    """Trenira i evaluira svih 5 kandidatnih modela (logika u zones.py's
+    """Trenira i evaluira sva 4 kandidatna modela (logika u zones.py's
     compare_zone_models()) na zone-timeline skupu, s kronološkim train/test
-    splitom (80/20 po datumu), i vraća metrike + koji je pobjednik po F1.
+    splitom (60/20/20 po datumu: trening / validacija za prag / test), i vraća metrike + koji je pobjednik po F1.
     Ovo je najskuplja operacija u cijelom servisu (~30-45s), zato se rezultat
     kešira po obliku skupa (compare_zone_models_cached)."""
     df, zones, flights_meta, flight_zone = _zone_pipeline_inputs(station_id, administration_id)
@@ -419,7 +419,8 @@ def insights(station_id: int = None, administration_id: int = None):
         slope, trend = 0.0, "stabilan"
 
     return {
-        "total": len(df),
+        "total": len(df),            # whole history, not the last 30 days
+        "last_30d": len(recent),
         "by_type": by_type,
         "by_source": by_source,
         "trend_30d": trend,

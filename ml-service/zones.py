@@ -383,7 +383,7 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
 
     return {
         "trained": True,
-        "n_rows": len(dataset), "n_positive": int(y.sum()),
+        "n_rows": len(dataset), "n_positive": int(y.sum()), "n_zones": int(dataset["zone"].nunique()),
         "train_size": len(X_train), "val_size": len(X_val), "test_size": len(X_test),
         "val_date": dataset.iloc[train_cutoff]["date"] if train_cutoff < len(dataset) else dataset.iloc[-1]["date"],
         "split_date": dataset.iloc[val_cutoff]["date"] if val_cutoff < len(dataset) else dataset.iloc[-1]["date"],
@@ -392,20 +392,24 @@ def compare_zone_models(dataset: pd.DataFrame) -> dict:
     }
 
 
-# Training all 4 models is expensive (~tens of seconds); a single academic
-# page load hits both /zone-model-metrics and /zone-predictions (the latter
-# needs "best_model" whenever no explicit model is requested), so an
-# in-process cache keyed by dataset shape avoids paying for it twice per load.
-_model_comparison_cache: dict = {"key": None, "result": None}
+# Training all 4 models is expensive (minutes at the current dataset scale);
+# a single academic page load hits both /zone-model-metrics and
+# /zone-predictions (the latter needs "best_model" whenever no explicit model
+# is requested), and the chat assistant calls them per user scope (station /
+# administration / whole network). One entry per dataset shape, so users with
+# different scopes don't keep evicting each other's result and retraining.
+_MODEL_CACHE_MAX = 8
+_model_comparison_cache: dict = {}
 
 
 def compare_zone_models_cached(dataset: pd.DataFrame) -> dict:
     key = (len(dataset), dataset["date"].max() if not dataset.empty else None, int(dataset["label"].sum()) if not dataset.empty else 0)
-    if _model_comparison_cache["key"] == key:
-        return _model_comparison_cache["result"]
+    if key in _model_comparison_cache:
+        return _model_comparison_cache[key]
     result = compare_zone_models(dataset)
-    _model_comparison_cache["key"] = key
-    _model_comparison_cache["result"] = result
+    if len(_model_comparison_cache) >= _MODEL_CACHE_MAX:
+        _model_comparison_cache.pop(next(iter(_model_comparison_cache)))  # drop the oldest entry
+    _model_comparison_cache[key] = result
     return result
 
 
